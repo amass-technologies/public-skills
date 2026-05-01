@@ -7,7 +7,7 @@ Agent skills for working with the [Amass](https://platform.amass.tech) *Core API
 Using [`npx skills`](https://skills.sh):
 
 ```bash
-npx skills add amass-technologies/skills
+npx skills add amass-technologies/public-skills
 ```
 
 This installs every skill under `skills/` in this repo.
