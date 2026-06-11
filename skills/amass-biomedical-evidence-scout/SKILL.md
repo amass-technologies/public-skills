@@ -36,6 +36,8 @@ The four tools the skill depends on are:
 
 (Hosted Claude.ai installs typically expose them under the `mcp__claude_ai_amass__` prefix; the names are the same.)
 
+The Amass MCP also exposes drug and regulatory tools — `search_amass_drugcore_records`, `get_amass_drugcore_record`, `search_amass_regulatorycore_records`, `get_amass_regulatorycore_record`, `get_amass_regulatorycore_document_section`. These are **optional** for this skill: their absence is not a Prerequisites failure. When present, use them as targeted enrichment for drug-centric topics (see "Optional enrichment: DrugCore & RegulatoryCore" below).
+
 **Before doing anything else, check that these tools are available in the current session.** If any of them is missing — or if the very first call returns an authentication / connection error rather than a normal data response — **stop immediately**. Do not proceed to Phase 1, do not attempt a workaround, and do not silently substitute another search source.
 
 Tell the user, in plain language:
@@ -65,7 +67,7 @@ Track three numbers across the workflow and report them in the Audit Log (Sectio
 Every cited record must have a stable identifier from this session: `amassId` + (`pmid`/`doi` for papers, `nctId` for trials). No identifier = not citable.
 
 **Tool constraints to be aware of**
-- Both search tools surface **up to 10 records per call** — the MCP does not expose a `limit` parameter. (The underlying Amass REST API supports more, but the MCP is the surface this skill uses.) Coverage scales by *running more searches with different phrasings and filters*, not by asking for more results.
+- All Amass MCP search tools surface **up to 10 records per call** — the MCP does not expose a `limit` parameter. (The underlying Amass REST API supports more, but the MCP is the surface this skill uses.) Coverage scales by *running more searches with different phrasings and filters*, not by asking for more results.
 - The 10-result cap is the single biggest constraint. The Phase 3 multi-search strategy is designed around it.
 - The Amass API enforces **60 requests per 60 seconds, per user/org**. That's well above what this skill needs at any depth, but: run searches sequentially, confirm each result arrived before sending the next, and don't fan out 5+ parallel calls. If you ever see a 429 / rate-limit error, back off, then retry.
 - Treat searches as the primary discovery tool and `get_*` calls as cheap follow-ups for enrichment (fulltext, references, citedBy, cross-links).
@@ -90,13 +92,13 @@ Before running anything, internalize the difference between the two cores. The s
 
 ### BiomedCore (papers) — `search_amass_biomedcore_records` / `get_amass_biomedcore_record`
 - **What's in it:** 39M+ PubMed/PMC citations with abstracts, fulltext where available, and reference graphs (`references`, `citedBy`).
-- **Filters available on search:** `minPublicationDate` (ISO date), `minJournalQualityJufo` (0=evaluated/below-peer-review, 1=peer-reviewed, 2=domain-leading, 3=highest), `isRetracted` (boolean).
+- **Filters available on search:** `minPublicationDate` (ISO date), `minJournalQualityJufo` (0=evaluated/below-peer-review, 1=peer-reviewed, 2=domain-leading, 3=highest), `isRetracted` (boolean), plus author/institution filters: `authorOrcids`, `authorNames`, `institutionRors`, `institutionNames` (each an array — OR within one filter, AND across filters; name matching is free-text token, so use the most distinctive token, e.g. a last name). The author filters are especially useful in late-phase enrichment: once Phase 1 surfaces a dominant lab, a follow-up search filtered to that author maps their output directly.
 - **`get_amass_biomedcore_record`** automatically returns the cross-link and reference fields — `references`, `citedBy`, and `referencesTrialCore` (which trials this paper cites). Set `includeFulltext: true` only when the abstract suggests the fulltext is worth the token cost (it can be large).
 - **Use for:** mechanism, target validation, biomarker evidence, systematic reviews, meta-analyses, retrospective analyses, the "why" of biomedical claims.
 
 ### TrialCore (clinical trials) — `search_amass_trialcore_records` / `get_amass_trialcore_record`
 - **What's in it:** 575K+ ClinicalTrials.gov trials with protocol summaries, phase, status, sponsor, conditions, intervention names/types, enrollment, completion dates, facility countries, and `referencesBiomedCore` (which papers cite this trial).
-- **Filters available (with full enum values):**
+- **Filters available (with full enum values).** Each enum filter accepts a single value or an array — arrays match ANY of the listed values (OR within one filter), while different filters combine with AND. `phase: ["PHASE2", "PHASE3"]` + `overallStatus: "RECRUITING"` = (Phase 2 OR Phase 3) AND recruiting.
   - `phase`: `EARLY_PHASE1`, `PHASE1`, `PHASE1/PHASE2`, `PHASE2`, `PHASE2/PHASE3`, `PHASE3`, `PHASE4`, `NA`
   - `overallStatus`: `RECRUITING`, `NOT_YET_RECRUITING`, `ENROLLING_BY_INVITATION`, `ACTIVE_NOT_RECRUITING`, `SUSPENDED`, `TERMINATED`, `COMPLETED`, `WITHDRAWN`, `UNKNOWN`, `WITHHELD`, `AVAILABLE`, `NO_LONGER_AVAILABLE`, `TEMPORARILY_NOT_AVAILABLE`, `APPROVED_FOR_MARKETING`
   - `studyType`: `INTERVENTIONAL`, `OBSERVATIONAL`, `EXPANDED_ACCESS`
@@ -109,6 +111,16 @@ Before running anything, internalize the difference between the two cores. The s
 - A TrialCore record's `referencesBiomedCore` field points to BiomedCore papers that reference the trial — usually publications of the trial's results, ancillary analyses, or follow-ups.
 
 These cross-links let you do things that are nearly impossible elsewhere: take a major Phase 3 trial's NCT ID, follow `referencesBiomedCore`, and find every paper that reports on or cites it. Or take a key paper, follow `referencesTrialCore`, and identify the underlying clinical study. Use these aggressively in Phase 3 enrichment.
+
+### Optional enrichment: DrugCore & RegulatoryCore
+
+When the topic centers on a specific drug or drug class **and** the optional tools are connected, 1–3 extra calls can sharpen the briefing considerably. These come out of the same call budget — substitute them for the lowest-value planned search, don't add them on top.
+
+- **`search_amass_drugcore_records` / `get_amass_drugcore_record`** — drug identity: canonical name vs. synonyms/trade names (feeds the Section 3 terminology-evolution table), modality (`drugType`), and highest clinical stage reached (`maxClinicalStage`). The get-by-ID variant (by Amass ID or ChEMBL ID) also returns parent/child hierarchy (salt forms, fixed-dose combos) and cross-links to trials, papers, and regulatory authorizations — one call that anchors the whole drug. Note: `referencesBiomedCore` on drug records is currently sparse; treat empty as "no links recorded," not "no evidence."
+- **`search_amass_regulatorycore_records`** — FDA + EMA authorization status on a shared schema. One search per lead drug answers "is this approved, where, and on what pathway?" — each record's always-present `authorizationsByAgency` field carries the other market's status, so US/EU divergence reads off a single call. Designations (`BREAKTHROUGH_THERAPY`, `PRIME`, `ACCELERATED_APPROVAL`, …) and `isOrphan` add regulatory context to the Section 3 timeline ("approved 2024 under accelerated approval" is a milestone).
+- **`get_amass_regulatorycore_record` / `get_amass_regulatorycore_document_section`** — deep regulatory reading (label sections, SmPC text). Almost always out of scope for a landscape briefing; mention the capability in Section 6 follow-ups rather than spending budget on it.
+
+Cite drug and regulatory records with the same discipline as papers and trials: `amassId` (+ ChEMBL ID for drugs, agency + product name for authorizations), counted in the Audit Log. The deliverable remains a paper + trial landscape — these cores annotate it, they don't become a third corpus.
 
 ---
 
