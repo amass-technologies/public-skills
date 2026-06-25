@@ -1,6 +1,6 @@
 # Amass Skills
 
-Agent skills for working with the [Amass](https://platform.amass.tech) *Core API platform — BiomedCore (biomedical publications), TrialCore (clinical trials), DrugCore (drugs & molecules), and RegulatoryCore (FDA & EMA drug authorizations).
+Agent skills for working with the [Amass](https://platform.amass.tech) *Core API platform — BiomedCore (biomedical publications), TrialCore (clinical trials), DrugCore (drugs & molecules), RegulatoryCore (FDA & EMA drug authorizations), and GeneCore (genes & drug targets).
 
 ## Install
 
@@ -16,7 +16,7 @@ This installs every skill under `skills/` in this repo.
 
 | Skill | What it does |
 | --- | --- |
-| [`amass-api`](skills/amass-api) | Search, look up, and cross-link records across all four Amass Cores — BiomedCore (publications), TrialCore (clinical trials), DrugCore (drugs/molecules), and RegulatoryCore (FDA/EMA authorizations, including parsed label/SmPC/review/EPAR text) — via the Amass platform API or MCP. Bundles a full API reference (`AMASS.md`). |
+| [`amass-api`](skills/amass-api) | Search, look up, and cross-link records across all five Amass Cores — BiomedCore (publications), TrialCore (clinical trials), DrugCore (drugs/molecules), RegulatoryCore (FDA/EMA authorizations, including parsed label/SmPC/review/EPAR text), and GeneCore (genes/drug targets with druggability, target-class, constraint, safety, and essentiality intelligence) — via the Amass platform API or MCP. Bundles a full API reference (`AMASS.md`). |
 | [`amass-biomedical-evidence-scout`](skills/amass-biomedical-evidence-scout) | Maps the evidence landscape for a drug, target, mechanism, or indication by searching papers (BiomedCore) and trials (TrialCore) in parallel via the Amass MCP, then synthesizes a cited landscape briefing — with optional DrugCore/RegulatoryCore enrichment. |
 
 ## Setup

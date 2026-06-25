@@ -1,6 +1,6 @@
 # Amass API Reference
 
-> Snapshot of <https://platform.amass.tech/markdown> as of 2026-06-11.
+> Snapshot of <https://platform.amass.tech/markdown> as of 2026-06-25.
 > If a request behaves contrary to what's documented here (e.g. a 400 cites a filter or value this file doesn't list), fetch the live page to check whether the API has moved on.
 
 Base URL: `https://api.amass.tech/api/v1`
@@ -31,6 +31,11 @@ Every Core follows the same three-endpoint pattern: search, get-by-ID, batch loo
 - `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMRC_`)
 - `GET  /records/{amassId}/document-sections/{documentSectionId}` — fetch one parsed source-document section with full text (section IDs start `AMRCDS_`)
 - `POST /records/lookup` — convert FDA application numbers, EMA product numbers, NDCs, or SPL Set IDs to Amass IDs
+
+### GeneCore — `/cores/genecore`
+- `GET  /records` — search genes / drug targets (43K+ records harmonized from HGNC, NCBI, UniProt, Open Targets)
+- `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMGC_`)
+- `POST /records/lookup` — convert Ensembl, HGNC, Entrez, UniProt, gene-symbol, OMIM, Orphanet, or IUPHAR IDs to Amass IDs
 
 ---
 
@@ -98,7 +103,7 @@ Repeatable filters combine **OR within one filter, AND across filters**:
 - `?phase=PHASE3&overallStatus=RECRUITING` → Phase 3 **and** recruiting.
 - `?authorNames=Hassabis&institutionNames=DeepMind` → (any Hassabis author) **and** (any DeepMind affiliation) — not necessarily the same author.
 
-This applies to BiomedCore's author/institution filters, TrialCore's enum filters, and RegulatoryCore's `agency` / `moleculeType` / `authorizationStatus` / `hasDesignation`.
+This applies to BiomedCore's author/institution filters, TrialCore's enum filters, RegulatoryCore's `agency` / `moleculeType` / `authorizationStatus` / `hasDesignation`, and GeneCore's `geneType` / `targetClass` / `tractabilityModality` / `tractabilityStage`.
 
 ---
 
@@ -360,7 +365,7 @@ Search matches drug names, trade names, synonyms, and descriptions — query by 
 |---|---|---|
 | `query` | string (required) | Drug names, trade names, synonyms, descriptions |
 | `limit` | int | 1–300, default 20 |
-| `include` | string (repeatable) | `parent`, `children`, `referencesTrialCore`, `referencesBiomedCore`, `referencesRegulatoryCore` |
+| `include` | string (repeatable) | `parent`, `children`, `referencesTrialCore`, `referencesBiomedCore`, `referencesRegulatoryCore`, `referencesGeneCore` |
 | `drugType` | enum (repeatable) | `SMALL_MOLECULE`, `ANTIBODY`, `PROTEIN`, `OLIGONUCLEOTIDE`, `GENE`, `ENZYME`, `ANTIBODY_DRUG_CONJUGATE`, `VACCINE_COMPONENT`, `CELL`, `OLIGOSACCHARIDE`, `VACCINE`, `UNKNOWN` |
 | `maxClinicalStage` | enum (repeatable) | `PRECLINICAL`, `IND`, `EARLY_PHASE1`, `PHASE1`, `PHASE1/PHASE2`, `PHASE2`, `PHASE2/PHASE3`, `PHASE3`, `PREAPPROVAL`, `APPROVAL`, `UNKNOWN` |
 
@@ -391,6 +396,7 @@ children                   string[]      AMDC_… IDs of child records (salts, c
 referencesTrialCore        string[]      AMTC_… IDs of associated trials
 referencesBiomedCore       string[]      AMBC_… IDs of associated publications
 referencesRegulatoryCore   string[]      AMRC_… IDs of FDA/EMA authorizations
+referencesGeneCore         string[]      AMGC_… IDs of genes this drug targets (resolved from its mechanism-of-action target Ensembl gene IDs)
 ```
 
 The parent/children hierarchy collapses salt forms, prodrugs, and fixed-dose combinations onto a single active ingredient. `parent: null` = top of hierarchy; `children: []` = leaf.
@@ -569,6 +575,157 @@ To compare the same topic across markets: resolve the counterpart record from `a
 
 ---
 
+## GeneCore — search parameters
+
+Keyword search across gene symbols, names, synonyms, gene families, RefSeq functional summaries, UniProt keywords, and ChEMBL target class. Beyond exact symbols/names, free-text concept queries (`tyrosine kinase`, `GPCR`, `apoptosis`) match the controlled-vocabulary keyword and class fields. Query by gene/target **identity or function** — not by drug name (for a drug, start in DrugCore and follow `referencesGeneCore`).
+
+| Param | Type | Notes |
+|---|---|---|
+| `query` | string (required) | Symbols, names, synonyms, gene families, RefSeq summaries, UniProt keywords, ChEMBL target class |
+| `limit` | int | 1–300, default 20 |
+| `include` | string (repeatable) | `protein`, `referencesDrugCore` |
+| `geneType` | enum (repeatable) | NCBI gene type / biotype (see below). Match ANY |
+| `isDruggable` | bool | `true` keeps Open Targets-druggable targets (any small-molecule or antibody tractability bucket) |
+| `isEssential` | bool | `true` keeps DepMap-essential genes (a dependency in ≥ 1 screen) |
+| `targetClass` | enum (repeatable) | Top-level ChEMBL target class (see below). Match ANY; full class path still returned |
+| `tractabilityModality` | enum (repeatable) | `SMALL_MOLECULE`, `ANTIBODY`, `PROTAC`, `OTHER_CLINICAL`. Alone matches any stage |
+| `tractabilityStage` | enum (repeatable) | `APPROVED_DRUG`, `ADVANCED_CLINICAL`, `PHASE_1_CLINICAL`. Alone matches any modality |
+| `hasSafetyLiabilities` | bool | `true` keeps genes with ≥ 1 curated Open Targets safety liability |
+| `maxConstraintLoeuf` | number | Keep genes with gnomAD v4.0 LOEUF ≤ this value (lower = more loss-of-function-constrained) |
+
+`tractabilityModality` and `tractabilityStage` combine as a cross-product where an omitted dimension means "any" (`tractabilityModality=SMALL_MOLECULE` alone matches any clinical stage; add `tractabilityStage=APPROVED_DRUG` to require a stage). Only the three clinical-precedent stages are filterable — the predictive lane is returned but not filterable. `isDruggable=true` is shorthand for "any satisfied small-molecule or antibody bucket".
+
+### `geneType` values (NCBI gene type / biotype)
+
+`PROTEIN_CODING`, `NCRNA`, `PSEUDO`, `TRNA`, `RRNA`, `SNRNA`, `SCRNA`, `SNORNA`, `MISCRNA`, `BIOLOGICAL_REGION`, `TRANSPOSON`, `OTHER`
+
+### `targetClass` values (top-level ChEMBL class)
+
+`ENZYME`, `MEMBRANE_RECEPTOR`, `ION_CHANNEL`, `TRANSPORTER`, `TRANSCRIPTION_FACTOR`, `EPIGENETIC_REGULATOR`, `SECRETED_PROTEIN`, `SURFACE_ANTIGEN`, `STRUCTURAL_PROTEIN`, `ADHESION`, `OTHER_CYTOSOLIC_PROTEIN`, `OTHER_NUCLEAR_PROTEIN`, `AUXILIARY_TRANSPORT_PROTEIN`, `UNCLASSIFIED_PROTEIN`
+
+---
+
+## GeneCore — record schema
+
+### Default fields (always returned)
+
+```
+amassId            string         AMGC_… canonical ID
+ensemblGeneId      string|null    Ensembl stable gene ID (e.g. ENSG00000141510)
+symbol             string|null    Approved gene symbol (e.g. TP53)
+name               string|null    Full gene name
+synonyms           string[]       Alternative symbols / aliases
+geneType           string|null    NCBI gene type / biotype (see values above)
+summary            string|null    NCBI RefSeq curated functional description
+location           string|null    Cytogenetic band (e.g. 17p13.1)
+chromosome         string|null    e.g. 17, X
+strand             string|null    + (forward) | - (reverse)
+entrezGeneId       string|null    NCBI Entrez gene ID
+hgncId             string|null    HGNC ID (e.g. HGNC:11998)
+uniprotIds         string[]       UniProt accession(s)
+hgncGeneGroups     object[]       HGNC gene families: {id, name}
+maneSelect         string[]       MANE Select transcript id(s) (RefSeq + Ensembl)
+omimId             string[]       OMIM id(s) for associated Mendelian disease/phenotype
+orphanet           string|null    Orphanet rare-disease ID
+iuphar             string|null    IUPHAR/Guide to Pharmacology target ID
+tractability       object|null    Druggability buckets by modality (see below)
+safetyLiabilities  object[]|null  Curated target-safety signals (see below)
+targetClass        object|null    ChEMBL target-class path + leaf id (see below)
+gnomadConstraint   object|null    gnomAD v4.0 gene-constraint summary (see below)
+depmapEssentiality object|null    DepMap CRISPR dependency summary (see below)
+```
+
+The five target-intelligence objects (`tractability` … `depmapEssentiality`) are returned by default, but are `null` when Open Targets has no data for the gene — common for non-protein-coding genes. `null`/empty means "no data recorded," not "not a target."
+
+### Optional fields (via `include`)
+
+```
+protein              object|null   Representative UniProt Swiss-Prot entry (see below); null if no reviewed protein
+referencesDrugCore   string[]      AMDC_… IDs of drugs that target this gene (cross-core link to DrugCore)
+```
+
+### Target-intelligence object shapes
+
+**`tractability`** — keyed by modality `smallMolecule` / `antibody` / `protac` / `otherClinical`; each modality splits its satisfied buckets into two lanes:
+```
+<modality>.clinical    string[]   Satisfied clinical-precedent buckets: Approved Drug | Advanced Clinical | Phase 1 Clinical
+<modality>.predictive  string[]   Satisfied predictive-evidence buckets (pockets, ligands, localization, …) — returned, not filterable
+```
+
+**`targetClass`**
+```
+path               string[]    Class labels broadest → leaf, e.g. ["Enzyme", "Transferase"]
+leafChemblClassId  number|null  ChEMBL protein-classification id of the leaf class
+```
+Only the top-level class is filterable (`targetClass=`); the full path is returned but deeper levels are not filterable.
+
+**`safetyLiabilities[]`**
+```
+event       string|null   Adverse event / safety term (e.g. cardiotoxicity)
+datasource  string|null   Curating source (e.g. ClinPGx, ToxCast)
+url         string|null   Datasource link for the gene
+effects     object[]      {direction, dosing} — modulation that produces the event
+biosamples  string[]      Cell/tissue labels observed in (e.g. ["HepaRG"])
+sources     object[]      Triggering drugs / assays: {name, type}
+```
+The `event` vocabulary is curated free text — filter on presence (`hasSafetyLiabilities=true`), then read events from the response.
+
+**`gnomadConstraint`** — keyed by variant class `synonymous` / `missense` / `lossOfFunction`; each carries observed/expected counts and `oe` (with `oeLower`/`oeUpper`; `synonymous`/`missense` also carry `constraintZ`). Headline loss-of-function metrics:
+```
+lossOfFunction.loeuf        LOEUF — observed/expected upper-bound fraction (lower = more intolerant); mirrors oeUpper
+lossOfFunction.pli          pLI — probability of loss-of-function intolerance
+lossOfFunction.loeufDecile  LOEUF decile (0 = most-constrained 10% of genes)
+lossOfFunction.loeufRank    Genome-wide LOEUF rank (lower = more constrained)
+```
+gnomAD v4.0 constrained-gene cutoffs: **LOEUF < 0.6** (distribution shifted from < 0.35 in v2.1.1), or **pLI ≥ 0.9**, or the first LOEUF decile. Filter with `maxConstraintLoeuf` (a lower bound selects more-constrained genes).
+
+**`depmapEssentiality`**
+```
+isEssential        boolean      Open Targets flag: a dependency in ≥ 1 screen (filter: isEssential=true)
+cellLinesTested    number       DepMap cell lines with a gene-effect measurement
+dependentCellLines number       Cell lines below the dependency cutoff (< -0.5)
+meanGeneEffect / medianGeneEffect  number|null   Central tendency of the gene-effect (Chronos) distribution
+minGeneEffect      number|null  Most negative gene-effect (strongest dependency)
+topDependencies    object[]     Most-dependent cell lines (≤10): {cellLineName, depmapId, tissue, disease, geneEffect, expression}
+```
+A more negative gene-effect means a stronger dependency.
+
+### `protein` shape (via `include=protein`)
+
+One representative UniProt Swiss-Prot entry per gene (prose fields from the canonical entry; list fields unioned across matched entries), in four blocks:
+```
+identity    canonicalAccession, entryName, annotationScore (1–5), evidenceLevel, mappedAccessions[]
+function    functionSummary, associatedDiseases, tissueSpecificity, keywords[], subcellularLocations[]
+biophysics  sequenceLength, molecularMassDa, ecNumbers[], ptmSummary, ptmTypes[]
+structure   has3dStructure, pdbIds[], pfamIds[], interproIds[]
+```
+`null` when the gene encodes no reviewed Swiss-Prot protein.
+
+---
+
+## GeneCore — lookup
+
+`POST /cores/genecore/records/lookup`
+
+```json
+{
+  "items": [
+    {"ensemblGeneId": "ENSG00000146648"},
+    {"hgncId": "HGNC:3236"},
+    {"entrezGeneId": "1956"},
+    {"uniprotId": "P00533"},
+    {"symbol": "EGFR"},
+    {"omimId": "131550"},
+    {"orphanet": "30815"},
+    {"iuphar": "1797"}
+  ]
+}
+```
+
+**Constraint:** each item must contain exactly one of `ensemblGeneId`, `hgncId`, `entrezGeneId`, `uniprotId`, `symbol`, `omimId`, `orphanet`, or `iuphar`. Same response shape as the other Cores; items fail independently, and `amassIds` is always an array (a shared `uniprotId`/`omimId` can resolve to more than one gene). Unknown IDs come back as `NOT_FOUND` rather than a dangling `AMGC_`.
+
+---
+
 ## Cross-core linking
 
 | Direction | Field | Include flag | Contents |
@@ -583,8 +740,10 @@ To compare the same topic across markets: resolve the counterpart record from `a
 | Drug → authorizations | `referencesRegulatoryCore` | `include=referencesRegulatoryCore` | `AMRC_…` IDs |
 | Authorization → active ingredients | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
 | Authorization → other-market authorizations | `authorizationsByAgency` | always present | `AMRC_…` IDs + status |
+| Drug → genes (targets) | `referencesGeneCore` | `include=referencesGeneCore` | `AMGC_…` IDs |
+| Gene → drugs | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
 
-There is no intra-core link in TrialCore (no trial-to-trial graph). The drug ↔ authorization relationship can be traversed from either side.
+There is no intra-core link in TrialCore (no trial-to-trial graph), and GeneCore has no intra-core hierarchy (every gene link points out to DrugCore). The drug ↔ authorization and gene ↔ drug relationships can each be traversed from either side.
 
 ---
 
@@ -634,6 +793,9 @@ When you get a 400, read `error.fields` before retrying — it tells you exactly
 - ClinicalTrials.gov: `https://clinicaltrials.gov/study/{nctId}`
 - ChEMBL: `https://www.ebi.ac.uk/chembl/explore/compound/{chemblId}`
 - Agency landing page / source PDFs: `sourceUrl` on RegulatoryCore records and document sections
+- Ensembl gene: `https://www.ensembl.org/Homo_sapiens/Gene/Summary?g={ensemblGeneId}`
+- NCBI Gene: `https://www.ncbi.nlm.nih.gov/gene/{entrezGeneId}`
+- UniProt: `https://www.uniprot.org/uniprotkb/{uniprotId}`
 
 ---
 
@@ -655,3 +817,6 @@ When you get a 400, read `error.fields` before retrying — it tells you exactly
 14. **Address document sections by `documentSectionId`**, not `path` (paths are opaque for FDA reviews and EPARs).
 15. **`authorizationsByAgency` and `documentSections` are always present** on RegulatoryCore records — they cannot be requested or suppressed via `include`.
 16. **DrugCore `referencesBiomedCore` is sparse** — empty means "no links recorded," not "no evidence."
+17. **GeneCore target-intelligence objects are default but often `null`** — `tractability` / `safetyLiabilities` / `targetClass` / `gnomadConstraint` / `depmapEssentiality` come back without `include`, but are `null` for genes Open Targets doesn't cover (most non-protein-coding genes). `null` = "no data," not "not a target."
+18. **GeneCore LOEUF: lower = more constrained** — `maxConstraintLoeuf` selects *more* loss-of-function-constrained genes (gnomAD v4.0 cutoff < 0.6).
+19. **GeneCore search matches gene/target identity and function, not drug names** — for a drug, start in DrugCore and follow `referencesGeneCore` to its targets.
