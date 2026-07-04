@@ -1,6 +1,6 @@
 # Amass API Reference
 
-> Snapshot of <https://platform.amass.tech/markdown> as of 2026-06-25.
+> Snapshot of <https://platform.amass.tech/markdown> as of 2026-07-04.
 > If a request behaves contrary to what's documented here (e.g. a 400 cites a filter or value this file doesn't list), fetch the live page to check whether the API has moved on.
 
 Base URL: `https://api.amass.tech/api/v1`
@@ -12,14 +12,14 @@ Base URL: `https://api.amass.tech/api/v1`
 Every Core follows the same three-endpoint pattern: search, get-by-ID, batch lookup.
 
 ### BiomedCore — `/cores/biomedcore`
-- `GET  /records` — search biomedical literature (39M+ PubMed/PMC citations)
+- `GET  /records` — search biomedical literature (40M+ PubMed/PMC citations)
 - `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMBC_`)
 - `POST /records/lookup` — convert PMIDs/DOIs to Amass IDs
 
 ### TrialCore — `/cores/trialcore`
-- `GET  /records` — search clinical trials (575K+ ClinicalTrials.gov records)
+- `GET  /records` — search clinical trials (1.2M+ records from ClinicalTrials.gov **and** the WHO ICTRP — non-US registries such as EUCTR, ChiCTR, JPRN, ISRCTN)
 - `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMTC_`)
-- `POST /records/lookup` — convert NCT IDs to Amass IDs
+- `POST /records/lookup` — convert NCT IDs or source-registry native IDs (`registryId`) to Amass IDs
 
 ### DrugCore — `/cores/drugcore`
 - `GET  /records` — search drugs/molecules (22K+ ChEMBL-derived records)
@@ -36,6 +36,13 @@ Every Core follows the same three-endpoint pattern: search, get-by-ID, batch loo
 - `GET  /records` — search genes / drug targets (43K+ records harmonized from HGNC, NCBI, UniProt, Open Targets)
 - `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMGC_`)
 - `POST /records/lookup` — convert Ensembl, HGNC, Entrez, UniProt, gene-symbol, OMIM, Orphanet, or IUPHAR IDs to Amass IDs
+
+### PatentCore — `/cores/patentcore` **(preview)**
+- `GET  /records` — search patent publications (full-text over title/abstract/claims/description; each patent family collapses to its most relevant publication)
+- `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMPC_`)
+- `POST /records/lookup` — convert publication numbers, application numbers, or family IDs to Amass IDs
+
+> **Preview.** PatentCore is available to all API users, but its schema may still change while in preview.
 
 ---
 
@@ -103,7 +110,7 @@ Repeatable filters combine **OR within one filter, AND across filters**:
 - `?phase=PHASE3&overallStatus=RECRUITING` → Phase 3 **and** recruiting.
 - `?authorNames=Hassabis&institutionNames=DeepMind` → (any Hassabis author) **and** (any DeepMind affiliation) — not necessarily the same author.
 
-This applies to BiomedCore's author/institution filters, TrialCore's enum filters, RegulatoryCore's `agency` / `moleculeType` / `authorizationStatus` / `hasDesignation`, and GeneCore's `geneType` / `targetClass` / `tractabilityModality` / `tractabilityStage`.
+This applies to BiomedCore's author/institution filters, TrialCore's enum filters, RegulatoryCore's `agency` / `moleculeType` / `authorizationStatus` / `hasDesignation`, and GeneCore's `geneType` / `targetClass` / `tractabilityModality` / `tractabilityStage`. PatentCore's multi-value filters use the same OR-within/AND-across rule but take **comma-separated** values in one param (e.g. `?countryCode=US,EP`) rather than a repeated param.
 
 ---
 
@@ -236,7 +243,7 @@ Items fail independently — always check each result for an `error` field befor
 |---|---|---|
 | `query` | string (required) | Full-text search |
 | `limit` | int | 1–300, default 20 |
-| `include` | string (repeatable) | `outcomes`, `detailedDescription`, `referencesBiomedCore` |
+| `include` | string (repeatable) | `outcomes`, `detailedDescription`, `referencesBiomedCore`, `referencesDrugCore` |
 | `phase` | enum (repeatable) | `EARLY_PHASE1`, `PHASE1`, `PHASE1/PHASE2`, `PHASE2`, `PHASE2/PHASE3`, `PHASE3`, `PHASE4`, `NA` |
 | `overallStatus` | enum (repeatable) | `RECRUITING`, `NOT_YET_RECRUITING`, `ENROLLING_BY_INVITATION`, `ACTIVE_NOT_RECRUITING`, `SUSPENDED`, `TERMINATED`, `COMPLETED`, `WITHDRAWN`, `UNKNOWN`, `WITHHELD`, `AVAILABLE`, `NO_LONGER_AVAILABLE`, `TEMPORARILY_NOT_AVAILABLE`, `APPROVED_FOR_MARKETING` |
 | `studyType` | enum (repeatable) | `INTERVENTIONAL`, `OBSERVATIONAL`, `EXPANDED_ACCESS` |
@@ -256,7 +263,10 @@ Items fail independently — always check each result for an `error` field befor
 
 ```
 amassId                      string         AMTC_… canonical ID
-nctId                        string|null    ClinicalTrials.gov identifier
+nctId                        string|null    ClinicalTrials.gov identifier. Null for non-US (ICTRP) trials
+registryId                   string|null    Source-registry native ID. Equals nctId for CT.gov; the registry-native ID (e.g. EUCTR2021-000123-45, ChiCTR2400012345) for WHO ICTRP trials. Populated for every record
+sourceRegistry               string|null    Registry the record came from: clinicaltrials_gov, euctr, ctis, chictr, isrctn, anzctr, jprn, ctri, drks, …
+sourceUrl                    string|null    Link to the trial on its source registry
 briefTitle                   string|null
 officialTitle                string|null
 briefSummary                 string|null
@@ -302,6 +312,7 @@ oversightHasDmc              boolean|null   Data Monitoring Committee
 detailedDescription      string|null
 outcomes                 object[]      Structured outcome results (see below)
 referencesBiomedCore     string[]      AMBC_… IDs of papers this trial references
+referencesDrugCore       string[]      AMDC_… IDs of drugs studied by this trial (reverse of DrugCore's referencesTrialCore)
 ```
 
 ### Arm group shape
@@ -348,12 +359,12 @@ referencesBiomedCore     string[]      AMBC_… IDs of papers this trial referen
 {
   "items": [
     {"nctId": "NCT06012345"},
-    {"nctId": "NCT05999999"}
+    {"registryId": "EUCTR2021-000123-45"}
   ]
 }
 ```
 
-**Constraint:** each item must contain exactly one `nctId`. Same response shape as BiomedCore lookup; items fail independently.
+**Constraint:** each item must contain exactly one of `nctId` or `registryId`. Use `registryId` (the source-registry native ID) to resolve non-US (ICTRP) trials, which have no `nctId`. Same response shape as BiomedCore lookup; items fail independently.
 
 ---
 
@@ -726,6 +737,116 @@ structure   has3dStructure, pdbIds[], pfamIds[], interproIds[]
 
 ---
 
+## PatentCore — search parameters **(preview)**
+
+One record = one patent publication. `query` is full-text search over title, abstract, claims, description, assignees, and inventors. **Search collapses each patent family to its most relevant publication** — the same invention filed across jurisdictions (US, EP, WO, …) and stages (application `A1`, grant `B2`) shares a `familyId`, and only the highest-ranked member is returned; its collapsed siblings are surfaced on `familyMembers`.
+
+**Note:** `limit` caps at **200** here (not 300), and PatentCore multi-value filters take **comma-separated** values in one param (match any within, AND across).
+
+| Param | Type | Notes |
+|---|---|---|
+| `query` | string (required) | Full-text over title, abstract, claims, description, assignees, inventors |
+| `limit` | int | 1–200, default 20 |
+| `include` | string (repeatable) | `claims`, `description`, `nplCitations`, `citedByPatents`, `referencesDrugCore`, `referencesBiomedCore` |
+| `countryCode` | string | Comma-separated jurisdiction codes, match any, e.g. `US,EP,WO` |
+| `kindCode` | string | Comma-separated kind codes, match any, e.g. `B2,A1` |
+| `language` | string | Comma-separated language codes, match any |
+| `cpcCodes` | string | Comma-separated CPC codes, match any |
+| `ipcCodes` | string | Comma-separated IPC codes, match any |
+| `assignee` | string | Comma-separated assignee names, match any. **Partial token match** — `Moderna` finds normalized `MODERNATX INC` (last token treated as a prefix); exact legal name not required |
+| `inventor` | string | Comma-separated inventor names, match any. Same partial-token rules as `assignee` (e.g. `Ciaramella` → `CIARAMELLA GIUSEPPE`) |
+| `hasClaims` | bool | `true`/`false` — patents that have claims text |
+| `hasDescription` | bool | `true`/`false` — patents that have a description |
+| `minPublicationDate` / `maxPublicationDate` | ISO date | |
+| `minFilingDate` / `maxFilingDate` | ISO date | |
+| `minGrantDate` / `maxGrantDate` | ISO date | Null for pending/never-granted apps — a grant-date filter silently drops them |
+| `minPriorityDate` / `maxPriorityDate` | ISO date | |
+| `minCitedByCount` | int | Minimum forward-citation (cited-by) count |
+
+### Which date to filter on
+
+A record carries four dates; pick the filter to match the intent (rough default: **priority > publication > grant > filing**):
+
+- `priorityDate` — the invention's effective date and legal prior-art cutoff. Best for **prior-art searches and innovation-trend analysis**; closest proxy for when the invention was made.
+- `publicationDate` — when the document entered the public record (~18 months after filing). Best for "what was recently disclosed"; most reliably populated.
+- `grantDate` — when the patent issued as an enforceable right. **Null for pending or never-granted applications.**
+- `filingDate` — administrative anchor for the 20-year term; rarely the right analytical filter on its own.
+
+Results come back by relevance only — there is **no sort-by-date**. Narrow with a range filter rather than expecting chronological order.
+
+### Family collapsing
+
+Search returns one publication per family (the most relevant member), so a landscape query isn't flooded with near-duplicates. The kept row lists its collapsed siblings' `AMPC_` IDs in `familyMembers` (may be a subset for a very large family). To retrieve **every** member of a family — including any not surfaced by a search — resolve the family via the lookup endpoint (`{"familyId": "<id>"}`), which returns the Amass ID of every member publication.
+
+---
+
+## PatentCore — record schema **(preview)**
+
+### Default fields (always returned)
+
+```
+amassId                   string         AMPC_… canonical ID
+publicationNumber         string|null    Source-neutral identity key, e.g. US-10266485-B2
+applicationNumber         string|null
+countryCode               string|null    Jurisdiction / patent-office code, e.g. US, EP, WO
+kindCode                  string|null    Document type/stage, e.g. A1, B2
+familyId                  string|null    Patent family identifier
+familyMembers             string[]       AMPC_… IDs of collapsed same-family siblings (empty when collapse is off; dereference via get/batch)
+title                     string|null    English-preferred
+abstract                  string|null    English-preferred
+language                  string|null    Language of the full text
+nonEnglishFallback        boolean|null   True when text is the original non-English language
+cpcCodes                  string[]       CPC classification codes
+ipcCodes                  string[]       IPC classification codes
+inventors                 string[]
+assignees                 string[]       Assignee / applicant names
+publicationDate           string|null    ISO date
+filingDate                string|null    ISO date
+grantDate                 string|null    ISO date
+priorityDate              string|null    ISO date (earliest priority)
+citedPatents              string[]       Backward: AMPC_… IDs of prior patents this one cites (out-of-corpus cites dropped)
+priorityClaimNumbers      string[]       Publication numbers claimed as priority
+parentPublicationNumbers  string[]       Lineage
+childPublicationNumbers   string[]       Lineage
+hasClaims                 boolean|null
+hasDescription            boolean|null
+nplCount                  number|null    Backward count of non-patent-literature refs this patent cites (list opt-in as nplCitations)
+citedByCount              number|null    Forward count of later patents citing this one (list opt-in as citedByPatents; count is exact even though the list drops out-of-corpus cites)
+```
+
+### Optional fields (via `include`)
+
+```
+claims                 string|null    Full claims text
+description            string|null    Full description text
+nplCitations          string[]       Raw non-patent-literature references (papers, books, standards) — not Amass IDs
+citedByPatents        string[]       Forward: AMPC_… IDs of later patents that cite this one
+referencesDrugCore    string[]       AMDC_… IDs of the patent's linked drugs (cross-core link to DrugCore)
+referencesBiomedCore  string[]       AMBC_… IDs of the papers this patent cites (resolved subset of nplCitations; cross-core link to BiomedCore)
+```
+
+**Citation fields split by direction.** *Backward* = what this patent cites (prior art, fixed at publication): `citedPatents`, `nplCitations`/`nplCount`, `referencesBiomedCore`. *Forward* = what cites this patent (impact, grows over time): `citedByPatents`/`citedByCount`. Each opt-in list has a default-returned count (`nplCount`, `citedByCount`) so you can judge magnitude before expanding. `nplCitations` are raw strings, not Amass IDs; `referencesBiomedCore` is the resolved subset that maps to BiomedCore papers.
+
+---
+
+## PatentCore — lookup **(preview)**
+
+`POST /cores/patentcore/records/lookup`
+
+```json
+{
+  "items": [
+    {"publicationNumber": "US-10266485-B2"},
+    {"applicationNumber": "US-15-123456"},
+    {"familyId": "12345678"}
+  ]
+}
+```
+
+**Constraint:** each item must contain exactly one of `publicationNumber`, `applicationNumber`, or `familyId`. `publicationNumber` resolves to at most one Amass ID; `applicationNumber` and `familyId` are one-to-many (they resolve to every member publication), so `amassIds` may hold several IDs. Same response shape as the other Cores; items fail independently, and `amassIds` is always an array.
+
+---
+
 ## Cross-core linking
 
 | Direction | Field | Include flag | Contents |
@@ -734,6 +855,7 @@ structure   has3dStructure, pdbIds[], pfamIds[], interproIds[]
 | Paper → papers (cites) | `references` | `include=references` | `AMBC_…` IDs |
 | Paper → papers (cited by) | `citedBy` | `include=citedBy` | `AMBC_…` IDs |
 | Trial → papers | `referencesBiomedCore` | `include=referencesBiomedCore` | `AMBC_…` IDs |
+| Trial → drugs | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
 | Drug → parent / children | `parent` / `children` | `include=parent&include=children` | `AMDC_…` IDs |
 | Drug → trials | `referencesTrialCore` | `include=referencesTrialCore` | `AMTC_…` IDs |
 | Drug → papers | `referencesBiomedCore` | `include=referencesBiomedCore` | `AMBC_…` IDs |
@@ -742,8 +864,13 @@ structure   has3dStructure, pdbIds[], pfamIds[], interproIds[]
 | Authorization → other-market authorizations | `authorizationsByAgency` | always present | `AMRC_…` IDs + status |
 | Drug → genes (targets) | `referencesGeneCore` | `include=referencesGeneCore` | `AMGC_…` IDs |
 | Gene → drugs | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
+| Patent → prior patents (cites) | `citedPatents` | always present | `AMPC_…` IDs |
+| Patent → later patents (cited by) | `citedByPatents` | `include=citedByPatents` | `AMPC_…` IDs |
+| Patent → family siblings | `familyMembers` | always present | `AMPC_…` IDs |
+| Patent → drugs | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
+| Patent → papers | `referencesBiomedCore` | `include=referencesBiomedCore` | `AMBC_…` IDs |
 
-There is no intra-core link in TrialCore (no trial-to-trial graph), and GeneCore has no intra-core hierarchy (every gene link points out to DrugCore). The drug ↔ authorization and gene ↔ drug relationships can each be traversed from either side.
+There is no intra-core link in TrialCore (no trial-to-trial graph), and GeneCore has no intra-core hierarchy (every gene link points out to DrugCore). PatentCore's intra-core links are the citation graph (`citedPatents` backward, `citedByPatents` forward) and family collapsing (`familyMembers`); its cross-core links (`referencesDrugCore`, `referencesBiomedCore`) are both backward. The drug ↔ authorization, gene ↔ drug, and drug/trial relationships can each be traversed from either side.
 
 ---
 
@@ -790,18 +917,19 @@ When you get a 400, read `error.fields` before retrying — it tells you exactly
 - PubMed: `https://pubmed.ncbi.nlm.nih.gov/{pmid}/`
 - PubMed Central: `https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/`
 - DOI: `https://doi.org/{doi}`
-- ClinicalTrials.gov: `https://clinicaltrials.gov/study/{nctId}`
+- ClinicalTrials.gov: `https://clinicaltrials.gov/study/{nctId}` — for non-US (ICTRP) trials with no `nctId`, use the record's `sourceUrl`
 - ChEMBL: `https://www.ebi.ac.uk/chembl/explore/compound/{chemblId}`
 - Agency landing page / source PDFs: `sourceUrl` on RegulatoryCore records and document sections
 - Ensembl gene: `https://www.ensembl.org/Homo_sapiens/Gene/Summary?g={ensemblGeneId}`
 - NCBI Gene: `https://www.ncbi.nlm.nih.gov/gene/{entrezGeneId}`
 - UniProt: `https://www.uniprot.org/uniprotkb/{uniprotId}`
+- Google Patents: `https://patents.google.com/patent/{publicationNumber}`
 
 ---
 
 ## Gotchas
 
-1. **No pagination.** `limit` caps at 300; narrow with filters.
+1. **No pagination.** `limit` caps at 300 (PatentCore: 200); narrow with filters.
 2. **No sort.** Relevance only.
 3. **Lookup items are mutually exclusive** — exactly one identifier per item.
 4. **Lookup items fail independently** — always check each result for `error`. `amassIds` is always an array.
@@ -820,3 +948,8 @@ When you get a 400, read `error.fields` before retrying — it tells you exactly
 17. **GeneCore target-intelligence objects are default but often `null`** — `tractability` / `safetyLiabilities` / `targetClass` / `gnomadConstraint` / `depmapEssentiality` come back without `include`, but are `null` for genes Open Targets doesn't cover (most non-protein-coding genes). `null` = "no data," not "not a target."
 18. **GeneCore LOEUF: lower = more constrained** — `maxConstraintLoeuf` selects *more* loss-of-function-constrained genes (gnomAD v4.0 cutoff < 0.6).
 19. **GeneCore search matches gene/target identity and function, not drug names** — for a drug, start in DrugCore and follow `referencesGeneCore` to its targets.
+20. **TrialCore covers non-US trials** — WHO ICTRP records (EUCTR, ChiCTR, JPRN, …) have a **null `nctId`**; use `registryId` to identify or look them up, and `sourceRegistry` / `sourceUrl` for provenance.
+21. **PatentCore is in preview** — its schema may still change; reconcile against the live docs if a field looks off.
+22. **PatentCore search collapses each family to one publication** — the kept row lists siblings in `familyMembers`; for every member of a family, look up by `{"familyId": "..."}`.
+23. **PatentCore `limit` caps at 200** (not 300), and its multi-value filters take **comma-separated** values in one param (e.g. `countryCode=US,EP`), not a repeated param.
+24. **PatentCore citation fields split backward vs forward** — `citedPatents` (prior art, default) and `citedByPatents` (later citing patents, opt-in) both hold `AMPC_` IDs; `nplCitations` are raw strings, `referencesBiomedCore` is the resolved paper subset.
