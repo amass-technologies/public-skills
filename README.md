@@ -23,10 +23,11 @@ This installs every skill under `skills/` in this repo.
 
 ### MCP showcase skills
 
-Five task-scoped skills that run over the [Amass MCP server](https://amass.tech/mcp). Each one has a live, validated example — a real prompt, the cited answer it produced, and a downloadable sample output — on the Amass site. Links are in [Live examples](#live-examples) below.
+Task-scoped skills that run over the [Amass MCP server](https://amass.tech/mcp), plus one general, interview-driven **target-discovery workbench**. Each one has a live, validated example — a real prompt, the cited answer it produced, and a downloadable sample output — in the **Skills & Prompts** library on the Amass site. Links are in [Live examples](#live-examples) below.
 
 | Skill | What it does |
 | --- | --- |
+| [`target-prioritization-matrix`](skills/target-prioritization-matrix) | General target-discovery workbench: interviews you for modality and criteria (druggability, safety, genetic constraint, essentiality, competition, clinical/literature/IP activity), discovers candidate targets in GeneCore, scores each across the chosen criteria using DrugCore/TrialCore/BiomedCore/PatentCore cross-links, and returns a tabular target overview in the format you pick — then offers to freeze that configuration into a reusable skill. |
 | [`trial-evidence-trace`](skills/trial-evidence-trace) | Takes one clinical-trial ID and returns the exact published papers that describe it — via the TrialCore→BiomedCore `referencesBiomedCore` graph — as a citation-ranked, trust-tagged table plus a CSV. |
 | [`indication-pipeline-landscape`](skills/indication-pipeline-landscape) | Maps an indication's current Phase-3 drug pipeline across every sponsor — each program tagged novel-agent vs repurposed-generic and scored by cross-core publication evidence — into one sorted Excel matrix. |
 | [`kol-paper-trial-triangulator`](skills/kol-paper-trial-triangulator) | Takes a KOL plus a context query and returns that author's most-relevant papers, each triangulated to the clinical trial it reports, as a trust-tagged engagement-dossier workbook. |
@@ -35,17 +36,18 @@ Five task-scoped skills that run over the [Amass MCP server](https://amass.tech/
 
 ## Live examples
 
-Each MCP showcase skill has a validated example on the Amass site — the paste-ready prompt, the grounded answer it produced, and a downloadable sample output:
+Each MCP showcase skill has a validated example in the [Skills & Prompts](https://amass.tech/skills) library (under **Resources**) on the Amass site — the paste-ready prompt, the grounded answer it produced, and a downloadable sample output:
 
 | Skill | Live example & sample output |
 | --- | --- |
-| `trial-evidence-trace` | <https://amass.tech/mcp-showcases/trial-evidence-trace> |
-| `indication-pipeline-landscape` | <https://amass.tech/mcp-showcases/indication-pipeline-landscape> |
-| `kol-paper-trial-triangulator` | <https://amass.tech/mcp-showcases/kol-paper-trial-triangulator> |
-| `orcid-record-self-verify` | <https://amass.tech/mcp-showcases/orcid-record-self-verify> |
-| `submission-evidence-assembler` | <https://amass.tech/mcp-showcases/submission-evidence-assembler> |
+| `target-prioritization-matrix` | <https://amass.tech/skills/target-prioritization-matrix> |
+| `trial-evidence-trace` | <https://amass.tech/skills/trial-evidence-trace> |
+| `indication-pipeline-landscape` | <https://amass.tech/skills/indication-pipeline-landscape> |
+| `kol-paper-trial-triangulator` | <https://amass.tech/skills/kol-paper-trial-triangulator> |
+| `orcid-record-self-verify` | <https://amass.tech/skills/orcid-record-self-verify> |
+| `submission-evidence-assembler` | <https://amass.tech/skills/submission-evidence-assembler> |
 
-Browse the full gallery at <https://amass.tech/mcp-showcases>.
+Browse the full library at <https://amass.tech/skills>.
 
 ## Packaged downloads
 
