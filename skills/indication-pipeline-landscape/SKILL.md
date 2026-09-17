@@ -1,6 +1,6 @@
 ---
 name: indication-pipeline-landscape
-description: Use when a competitive-intelligence analyst names one indication (e.g. "MASH", "nonalcoholic steatohepatitis", "obesity") and wants the current Phase-3 drug pipeline mapped across every sponsor — running two or more TrialCore searches and unioning them to break the 10-result cap, tagging each program novel-agent vs repurposed-generic, and overlaying the cross-core referencesBiomedCore publication-evidence count as a maturity proxy — emitted as one sorted .xlsx matrix.
+description: Use when a competitive-intelligence analyst names one indication (e.g. "MASH", "nonalcoholic steatohepatitis", "obesity") and wants the current Phase-3 drug pipeline mapped across every sponsor — running two or more TrialCore searches and unioning them to broaden coverage past any one query's relevance ranking, tagging each program novel-agent vs repurposed-generic, and overlaying the cross-core referencesBiomedCore publication-evidence count as a maturity proxy — emitted as one sorted .xlsx matrix.
 license: Apache-2.0
 metadata: { author: amass, version: "0.1.0" }
 ---
@@ -44,12 +44,13 @@ string — the search engine treats them as garbage tokens.
 ## The Amass MCP calls (exact sequence)
 
 1. **Search, angle A.** `search_amass_trialcore_records(query="<modern spelling>", phase="PHASE3",
-   interventionType="DRUG")` → up to 10 trials. There is no `sponsorType` filter, so the
+   interventionType="DRUG")` → up to `limit` trials. There is no `sponsorType` filter, so the
    multi-sponsor view comes free from the indication query itself.
 2. **Search, angle B.** `search_amass_trialcore_records(query="<classic spelling>", phase="PHASE3",
-   interventionType="DRUG")` → up to 10 trials. Run one search per terminology variant.
-   **10-cap:** every search call returns at most 10 results with no `total` — this is a **sample,
-   not a census**. The union broadens coverage but never makes it exhaustive; say so in the output.
+   interventionType="DRUG")` → up to `limit` trials. Run one search per terminology variant.
+   **No total:** `limit` is 1–50 and defaults to 10, and a search never returns a `total` — so this is
+   a **sample, not a census**, at any limit. Raising `limit` and unioning terminology variants both
+   broaden coverage; neither makes it exhaustive. Say so in the output.
 3. **Union + dedupe** the result sets on `nctId`. (Anchor: A=10, B=10, overlap=2 → **18 unique**.)
 4. **Per-trial cross-core walk.** For each unique NCT,
    `get_amass_trialcore_record(type="nctId", value=<NCT>)`. Read `referencesBiomedCore` — the array
@@ -84,7 +85,7 @@ Then:
 - A **Verdict** line: `Indication <X>: N unique Phase-3 drug trials (k-query union, overlap=j)
   across ~M sponsors; P novel-agent vs Q repurposed/supplement; evidence links concentrated in the
   mature tier (top program: <acronym> <drug>, <count> papers).`
-- A **Scope note** blockquote (10-cap sample-not-census; class tag read client-side; evidence count
+- A **Scope note** blockquote (no-total sample-not-census; class tag read client-side; evidence count
   is a maturity proxy, not a census).
 - Emit the matrix as `<indication-slug>-pipeline-landscape.xlsx`.
 

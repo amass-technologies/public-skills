@@ -42,12 +42,13 @@ Amass returns the real asset→trial→paper graph with defensible trust metadat
 ## The Amass MCP calls (exact sequence)
 
 1. **Find the pivotal trials.** `search_amass_trialcore_records(query=<asset>, phase="PHASE3")`. The
-   search returns at most 10 results (the MCP cap; no `limit` parameter, no total count).
-   **10-cap completeness gate — run this immediately:**
-   - **< 10 results** → the result set is complete for this asset. State the exact count and proceed;
-     do not emit a truncation banner. (Anchor: mavacamten → **6** trials, complete.)
-   - **exactly 10 results** → the set may be truncated at the cap. Emit the banner verbatim: *"Result
-     set may be truncated at the 10-cap; matrix completeness not guaranteed."* Tell the writer the
+   search returns at most `limit` results — 1–50, defaulting to 10 — and no total count. This skill
+   runs at the default; raise `limit` if an asset plausibly has more than ten Phase-3 trials.
+   **Completeness gate — run this immediately, against the `limit` in force (10 by default):**
+   - **fewer results than `limit`** → the result set is complete for this asset. State the exact count
+     and proceed; do not emit a truncation banner. (Anchor: mavacamten → **6** trials, complete.)
+   - **exactly `limit` results** → the set may be truncated. Emit the banner verbatim: *"Result set may
+     be truncated at the requested limit; matrix completeness not guaranteed."* Tell the writer the
      dossier is a sample, not a census of the asset's Phase-3 trials, and broaden by re-running with a
      second wording or a wider phase and unioning the results.
 2. **Fetch each trial's identity + edge.** `get_amass_trialcore_record(type="nctId", value=<NCT>)` per
@@ -77,7 +78,7 @@ get-by-ID record fields, not a separate search step.
 ## Output template
 
 **Header (honest identity + completeness):** asset name, the Phase-3 trial count returned, and the
-completeness verdict — either "search returned N < 10 ⇒ complete matrix for this asset" or the
+completeness verdict — either "search returned N, under the requested limit ⇒ complete matrix for this asset" or the
 truncation banner. State the total describing-paper count and the retracted count.
 
 **Narrative grouped by trial (the .docx):** one section per trial, ordered by describing-paper count
@@ -92,7 +93,7 @@ enrollment, and link count. Under it, one bullet per describing paper:
 `trial_NCT | trial_acronym | sponsor | trial_status | paper_PMID | paper_AMBC | title | journal | date | JuFo | citationCount | isRetracted`.
 
 **Completeness banner in both artifacts:** for a complete asset, state "N/N trials complete (search
-returned N < 10-cap)." For a truncated asset, state the truncation banner instead.
+returned N, under the requested limit)." For a truncated asset, state the truncation banner instead.
 
 **Verdict line:** "<Asset>: <N> pivotal Phase-3 trials (complete / truncated), <M> describing papers,
 <K> retracted; highest-cited: <title> (<cites> citations, PMID <pmid>, JuFo <tier>)."

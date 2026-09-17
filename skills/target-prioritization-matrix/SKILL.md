@@ -77,7 +77,7 @@ Reflect the chosen configuration back in one line before running, so the user ca
 ## The Cores this skill draws on (criterion → Core → field)
 
 Point every column at a real field. This is the map from an interview answer to the Amass call that fills
-it. `search_*` returns up to 10 full records per call; `get_*` fetches one record by id.
+it. `search_*` returns up to `limit` full records per call (1–50, default 10); `get_*` fetches one record by id.
 
 | Criterion (column) | Core | Call | Field / filter that fills it |
 |---|---|---|---|
@@ -90,9 +90,9 @@ it. `search_*` returns up to 10 full records per call; `get_*` fetches one recor
 | **Safety liabilities** | GeneCore | search filter + record | `hasSafetyLiabilities`; read `safetyLiabilities[].event` (curated Open Targets/ClinPGx signals) |
 | **Biotype** | GeneCore | search filter + record | `geneType` (`PROTEIN_CODING`, `NCRNA`, …) |
 | **Competition / precedent** | GeneCore → **DrugCore** | `get_amass_genecore_record` | `referencesDrugCore` **array length** = number of drugs Amass links as targeting this gene. Drill a few via DrugCore for `name` / `drugType` / `maxClinicalStage`. |
-| **Clinical activity** | **TrialCore** | `search_amass_trialcore_records(query="<symbol> inhibitor <indication>", phase=…)` | Count of returned trials — a **capped sample** (≤10, no total), a presence signal, not a census |
-| **Literature depth** | **BiomedCore** | `search_amass_biomedcore_records(query="<symbol> <indication> target")` | Count of returned papers — a **capped sample** (≤10) |
-| **IP activity** | **PatentCore** | `search_amass_patentcore_records(query="<symbol> inhibitor")` | Count of returned patents — a **capped sample** (≤10) |
+| **Clinical activity** | **TrialCore** | `search_amass_trialcore_records(query="<symbol> inhibitor <indication>", phase=…)` | Count of returned trials — a **capped sample** (at most `limit`, no total), a presence signal, not a census |
+| **Literature depth** | **BiomedCore** | `search_amass_biomedcore_records(query="<symbol> <indication> target")` | Count of returned papers — a **capped sample** (at most `limit`) |
+| **IP activity** | **PatentCore** | `search_amass_patentcore_records(query="<symbol> inhibitor")` | Count of returned patents — a **capped sample** (at most `limit`) |
 | **Approval status** | DrugCore → **RegulatoryCore** | drug record `referencesRegulatoryCore` | Whether any linked drug carries an FDA/EMA authorization |
 
 For a fuller field reference, see the `amass-api` skill's `AMASS.md` (GeneCore record schema and filters).
@@ -101,16 +101,18 @@ For a fuller field reference, see the `amass-api` skill's `AMASS.md` (GeneCore r
 
 1. **Build 1–3 query angles from the seed.** The engine is bag-of-tokens with no stemming, so distinct
    spellings and synonyms are distinct tokens — unioning a couple of angles (e.g. `cyclin dependent
-   kinase mitotic checkpoint` and `aurora polo like kinase spindle`) broadens coverage past the 10-cap.
+   kinase mitotic checkpoint` and `aurora polo like kinase spindle`) broadens coverage past any one
+   query's relevance ranking.
    Strip punctuation (quotes, hyphens, parentheses) — the engine treats it as garbage tokens.
 2. **Apply the interview's filters on every angle.** Push as much as possible into the enum filters
    (`targetClass`, `tractabilityModality`/`tractabilityStage`, `isDruggable`, `isEssential`,
    `hasSafetyLiabilities`, `maxConstraintLoeuf`, `geneType`) rather than filtering client-side. Filters do
    double duty: they sharpen relevance **and** cut token load (see overflow note below).
-3. **Union + dedupe on `ensemblGeneId`.** Report the honest count: `A=10, B=10, overlap=k → N unique`.
-   Each search caps at 10 with no total — the union is a **broadened sample, not a census**. Say so.
+3. **Union + dedupe on `ensemblGeneId`.** Report the honest count: `A=<n>, B=<n>, overlap=k → N unique`.
+   Search takes a `limit` of 1–50 (default 10) but never returns a total — the union is a **broadened
+   sample, not a census** at any limit. Say so.
 4. **Handle the heavy-record overflow.** A GeneCore search returns **full records** (target intelligence,
-   long PDB lists in `protein.structure`), so a 10-record page can exceed a single call's token budget and
+   long PDB lists in `protein.structure`), so a page of them can exceed a single call's token budget and
    get saved to a file. When that happens, do **not** try to read the whole file into context — extract
    just the fields you need with `jq` (`.results[] | {symbol, targetClass, tractability, depmapEssentiality,
    gnomadConstraint, safetyLiabilities}`). Filtering hard in step 2 is the first defense.
@@ -139,12 +141,14 @@ asked for.
   (crowded-with-approved vs early), fetch a few of those `AMDC_` ids from DrugCore for `drugType` and
   `maxClinicalStage`.
 - **Clinical / literature / IP activity (capped-sample proxies):** one TrialCore / BiomedCore /
-  PatentCore search per candidate, as in the map. These are **≤10-result samples with no total** — treat
-  them as presence/intensity flags (`0`, `3`, `10+`), never as exact counts. Mark a cell `10+` when the
-  search returns exactly 10 (it is capped).
+  PatentCore search per candidate, as in the map. These return at most the `limit` you passed (1–50,
+  default 10) and never a total — treat them as presence/intensity flags (`0`, `3`, `10+`), never as
+  exact counts. Mark a cell `<limit>+` when the search comes back full. Keep the same `limit` across
+  every candidate, or the column compares nothing.
   - **Watch for saturation.** For a mature, heavily-studied target class, a broad per-symbol query
-    (`"<symbol> inhibitor cancer"`) returns the full 10-result page for *every* candidate — the column
-    goes uniformly `10+` and stops differentiating. (Observed live on the oncology essential-kinase
+    (`"<symbol> inhibitor cancer"`) comes back full for *every* candidate — the column goes uniformly
+    `<limit>+` and stops differentiating. Raising `limit` pushes the saturation point out but does not
+    remove it. (Observed live on the oncology essential-kinase
     anchor: all 12 kinases saturated all three of TrialCore/BiomedCore/PatentCore.) When that happens,
     don't present three dead columns as if they ranked anything — say the class is saturated, lead with
     the `referencesDrugCore` count (the one signal that *does* separate the field), and, if you need real
@@ -213,18 +217,18 @@ This output ranks targets and names how crowded each is, so it carries weight �
 - **The `clinical` vs `predictive` tractability distinction is load-bearing.** Report the `clinical` lane
   (real clinical precedent) as the headline; label predictive-only tractability as computational, not as
   evidence a drug exists.
-- **Trial / paper / patent counts are capped samples, not censuses.** Each underlying search returns ≤10
-  results with no total. Present them as intensity flags and mark `10+` when capped. The one true count is
-  `referencesDrugCore` (a graph edge).
+- **Trial / paper / patent counts are capped samples, not censuses.** Each underlying search returns at
+  most its `limit` and never a total. Present them as intensity flags and mark `<limit>+` when a search
+  comes back full. The one true count is `referencesDrugCore` (a graph edge).
 - **`isEssential` is a double-edged read.** A DepMap-essential gene is a strong dependency **and** often a
   pan-lethal target with a narrow therapeutic window — flag it as a caveat, not an unqualified plus.
 - **The verdict is a field claim, not an opinion** about which target is "best" — it states counts, stages,
   and edge lengths that trace to the returned records.
 
-> **Scope note (paste into the output).** Candidates come from a union of relevance-ranked top-10 GeneCore
+> **Scope note (paste into the output).** Candidates come from a union of relevance-ranked GeneCore
 > searches — a **broadened sample, not a census**; more query angles surface more. Target-intelligence
 > fields are verbatim from Open Targets / gnomAD / DepMap / UniProt as harmonized in GeneCore; `null` =
 > "no data recorded," not zero. `n_drugs` is the length of each gene's `referencesDrugCore` edge (drugs
 > Amass links as targeting it), **0 = unprecedented, not undruggable**. Trial/paper/patent columns are
-> capped ≤10 samples (presence/intensity flags), not exact counts. `isEssential` (DepMap) is a
+> capped samples (presence/intensity flags), not exact counts. `isEssential` (DepMap) is a
 > cell-line dependency signal — strong biology, but pan-essential targets carry therapeutic-window risk.

@@ -126,6 +126,8 @@ This applies to BiomedCore's author/institution filters, TrialCore's enum filter
 | `minCitationCount` | int | 0–100000 |
 | `minJournalQualityJufo` | enum | `0`, `1`, `2`, `3` (see below) |
 | `isRetracted` | bool | `true` / `false` |
+| `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the publication date. Records with no update date are excluded |
+| `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |
 | `authorOrcids` | string (repeatable) | Match ANY. Bare (`0000-0003-1234-5678`) or URL form |
 | `authorNames` | string (repeatable) | Match ANY. Free-text token (PubMed indexes `LastName Initials`, e.g. `Liu DR` — last-name token is safest) |
 | `institutionRors` | string (repeatable) | Match ANY. Bare (`03vek6s52`) or URL form |
@@ -254,6 +256,8 @@ Items fail independently — always check each result for an `error` field befor
 | `minStartDate` / `maxStartDate` | ISO date | |
 | `minCompletionDate` / `maxCompletionDate` | ISO date | |
 | `minEnrollment` | int | Minimum participants |
+| `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the registration or start date. Records with no update date are excluded |
+| `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |
 
 ---
 
@@ -448,6 +452,8 @@ One record = one authorization (FDA or EMA). `query` matches the structured meta
 | `hasDesignation` | enum (repeatable) | `PRIORITY_REVIEW`, `BREAKTHROUGH_THERAPY`, `FAST_TRACK`, `RMAT`, `ACCELERATED_APPROVAL`, `ACCELERATED_ASSESSMENT`, `PRIME`, `CONDITIONAL_MA`, `EXCEPTIONAL_CIRCUMSTANCES` — each applies only to the agency that owns it |
 | `isOrphan` | bool | Exact cross-walk: FDA Orphan Drug / EMA Orphan Medicine |
 | `minAuthorizationDate` / `maxAuthorizationDate` | ISO date | |
+| `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the authorization date. Records with no update date are excluded |
+| `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |
 | `amassId` | string | Scope the full-text search to a single record's source documents |
 
 ---

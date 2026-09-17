@@ -32,7 +32,7 @@ A self-audit skill for a researcher (or their grants office, on request) checkin
      minJournalQualityJufo=<min_jufo, optional>
    )
    ```
-   `authorOrcids` is an MCP-exclusive BioMedCore filter that matches the verified ORCID on author metadata, not a free-text name. It is an ANY-author match — a row qualifies if at least one author carries the ORCID, and the result does not name which author matched. Confirm the ORCID-holder actually appears in each returned author list. The search returns `title`, `journal`, `publicationDate`, `citationCount`, `journalQualityJufo`, `isRetracted`, `authors`, `pmid`, `amassId` — but NOT the trial edge.
+   The search returns at most `limit` records — 1–50, defaulting to the 10 this skill runs at — and no total; raise `limit` for a researcher with a long record. `authorOrcids` is an MCP-exclusive BioMedCore filter that matches the verified ORCID on author metadata, not a free-text name. It is an ANY-author match — a row qualifies if at least one author carries the ORCID, and the result does not name which author matched. Confirm the ORCID-holder actually appears in each returned author list. The search returns `title`, `journal`, `publicationDate`, `citationCount`, `journalQualityJufo`, `isRetracted`, `authors`, `pmid`, `amassId` — but NOT the trial edge.
 2. **Per-paper trial-edge read.** For each returned record, call:
    ```text
    get_amass_biomedcore_record(type="amassId", value="<amassId>")
@@ -41,7 +41,7 @@ A self-audit skill for a researcher (or their grants office, on request) checkin
 3. **Client-side three-dimension screen.** For each row compute: retracted? (`isRetracted=true`); below peer-review? (`journalQualityJufo < 1`, i.e. JuFo 0 or null); trial-linked? (`referencesTrialCore` non-empty). A row is `clean` only if none fire; otherwise tag it with the dimension(s) that fired.
 4. **Assemble the spreadsheet.** One header row + one row per paper, columns: `PMID`, `AMBC`, `title`, `journal`, `publicationDate`, `journalQualityJufo`, `citationCount`, `isRetracted`, `referencesTrialCore`, `integrityFlag`. Add a verdict sheet with the counts.
 
-**Rate-limit batching.** This skill issues one search plus up to 10 get-by-ID calls per ORCID. Pace Amass calls at roughly one every two seconds; the run stays well inside the 60-request / 60-second envelope. On HTTP 429 read `Retry-After`, back off, then resume.
+**Rate-limit batching.** This skill issues one search plus one get-by-ID call per returned paper — up to `limit`, so up to 50 if you raise it. Pace Amass calls at roughly one every two seconds; batch in chunks and pause so the run stays inside the 60-request / 60-second envelope. On HTTP 429 read `Retry-After`, back off, then resume.
 
 **Metadata-only overflow recovery.** A heavily-cited paper's full record can overflow the per-call token budget (the `citedBy` / `references` arrays are large). If a `get_amass_biomedcore_record` overflows, re-read only the fields this skill needs (`referencesTrialCore`, `isRetracted`, `journalQualityJufo`) — do not drop the row and do not guess the edge.
 
@@ -67,7 +67,7 @@ The `integrityFlag` cell is `clean` when no dimension fires, else a join of the 
 ## Failure modes & recovery
 
 - **Empty result set (`{"results": []}`).** No papers matched the ORCID *in Amass's indexed metadata* — NOT proof the researcher has no papers. Report it as "Amass indexes no papers under this ORCID as of <date>" and suggest a fallback `authorNames` search to check whether the record exists under a name but is missing the ORCID link.
-- **10-cap on a prolific researcher.** Always frame the returned rows as a relevance-ranked sample, not the full record; full export needs raw HTTP (`limit > 10` not exposed via the MCP). Never say "all your papers."
+- **A prolific researcher exceeds any limit.** `limit` tops out at 50, and search returns no total, so a researcher with more indexed papers than that still comes back partial. Always frame the returned rows as a relevance-ranked sample, not the full record; a fuller export needs the REST API, whose `limit` goes to 300. Never say "all your papers."
 - **Empty `referencesTrialCore`.** `[]` is the common, expected case — it means no trial linkage, which is a clean signal, not missing data. Report it as `none`.
 - **Token-budget overflow on get-by-ID.** Recover by re-reading just the needed metadata fields (see above); do not drop the row.
 - **429 rate limit.** Read `Retry-After`, back off, then re-issue the call.
@@ -82,5 +82,5 @@ The `integrityFlag` cell is `clean` when no dimension fires, else a join of the 
 - **Verdict as a checkable field claim.** "Amass indexes N papers under this ORCID in this sample, R flagged isRetracted=true, T trial-linked, as of <date>." Not "your record is excellent / weak."
 - **No imputing retraction reason or intent.** If a row is `isRetracted=true`, report the flag and the identifiers only; never narrate why or assign blame.
 - **Identity confirmed, not assumed.** The `authorOrcids` filter is an ANY-author match that does not name which author matched; confirm the ORCID-holder in each author list before counting the row as theirs.
-- **Sample, not census.** State the 10-cap on every run.
+- **Sample, not census.** State the `limit` you passed, and that search returns no total, on every run.
 - **Self-audit framing only.** Verifying one's own (or a consenting colleague's) record — never a committee auditing a candidate.

@@ -27,9 +27,9 @@ field, never a guess.
 - Works for any KOL + topic, not just the anchor: validated on Scott D. Solomon · heart failure
   preserved ejection fraction trial (a distinct trial portfolio — TOPCAT, PARAGON-HF, DELIVER).
 
-Do **not** invoke for an exhaustive bibliometric census of an author (the 10-cap makes this a
-relevance sample, not the full oeuvre — see Failure modes), nor when the user has a trial ID and
-wants its describing papers (that is the inverse trial→paper direction — walk `referencesBiomedCore`
+Do **not** invoke for an exhaustive bibliometric census of an author (search returns no total at
+any `limit`, so this is a relevance sample, not the full oeuvre — see Failure modes), nor when the
+user has a trial ID and wants its describing papers (that is the inverse trial→paper direction — walk `referencesBiomedCore`
 from a TrialCore record instead).
 
 ## Inputs
@@ -50,9 +50,10 @@ Anchor example: `kol = "Mikhail Kosiborod"`, `context_query = "cardiometabolic h
    → up to 10 papers. `authorNames` matches any record with at least one author matching the token —
    it is an ambiguous token-match with **no prefix expansion and no identity resolution**. Verify
    the KOL actually appears in each returned record's `authors` list before keeping the row (on the
-   anchor, all 10 carried Kosiborod). **10-cap = sample, not census** — this is the top-10 by
-   relevance to the query, NOT the author's full bibliography. The MCP returns no total; never claim
-   exhaustiveness. To trust-gate, add `minJournalQualityJufo` — but confirm the returned
+   anchor, all 10 carried Kosiborod). **Sample, not census** — this is the top-10 by relevance to
+   the query, NOT the author's full bibliography. `limit` accepts 1–50 and defaults to the 10 this
+   skill runs at, and no search returns a total — never claim exhaustiveness at any limit.
+   To trust-gate, add `minJournalQualityJufo` — but confirm the returned
    `journalQualityJufo` on each row rather than assuming it as a hard gate.
 
 2. **Triangulate (per-paper cross-core fan-out — the HEADLINE step).**

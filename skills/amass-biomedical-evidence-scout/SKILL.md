@@ -67,8 +67,8 @@ Track three numbers across the workflow and report them in the Audit Log (Sectio
 Every cited record must have a stable identifier from this session: `amassId` + (`pmid`/`doi` for papers, `nctId` for trials). No identifier = not citable.
 
 **Tool constraints to be aware of**
-- All Amass MCP search tools surface **up to 10 records per call** — the MCP does not expose a `limit` parameter. (The underlying Amass REST API supports more, but the MCP is the surface this skill uses.) Coverage scales by *running more searches with different phrasings and filters*, not by asking for more results.
-- The 10-result cap is the single biggest constraint. The Phase 3 multi-search strategy is designed around it.
+- All Amass MCP search tools take a **`limit` of 1–50, defaulting to 10**. Raise it when one phrasing should return more; the underlying REST API goes to 300 if you need more than 50.
+- No search returns a `total`, at any limit — so a result set is never provably complete, and coverage still scales by *running more searches with different phrasings and filters*, not by `limit` alone. The Phase 3 multi-search strategy is built on that.
 - The Amass API enforces **60 requests per 60 seconds, per user/org**. That's well above what this skill needs at any depth, but: run searches sequentially, confirm each result arrived before sending the next, and don't fan out 5+ parallel calls. If you ever see a 429 / rate-limit error, back off, then retry.
 - Treat searches as the primary discovery tool and `get_*` calls as cheap follow-ups for enrichment (fulltext, references, citedBy, cross-links).
 
@@ -481,7 +481,7 @@ Transparency about how the briefing was built. The reader needs this to calibrat
 - Records cited in this document: N papers, N trials
 
 **Coverage notes:**
-- Each search caps at 10 records — total coverage is bounded by `searches × 10` minus duplicates. With N successful searches, the theoretical ceiling is N×10; actual unique = M.
+- Each search returns at most the `limit` you passed — total coverage is bounded by the sum of those limits minus duplicates. State the ceiling and the actual unique count M.
 - Sub-areas with thin coverage (<5 records): list them and recommend follow-up: "Sub-area X returned 3 records — consider broadening terminology or running a targeted search on PubMed/CT.gov."
 - Any content drawing on model knowledge rather than Amass results is labeled `[Background — model knowledge, not from Amass]` inline.
 
