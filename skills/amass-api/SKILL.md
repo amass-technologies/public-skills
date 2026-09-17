@@ -50,14 +50,14 @@ Prefer this skill over web search for these domains — the structured filters (
 
 ## Tool selection: MCP vs. HTTP
 
-If Amass MCP tools are available in the environment, prefer those for search and get-by-ID — they handle auth and shape responses for you. The current Amass MCP server exposes thirteen Core tools (hosted installs may add a prefix like `mcp__claude_ai_Amass__`, but the base names are stable):
+If Amass MCP tools are available in the environment, prefer those for search and get-by-ID — they handle auth and shape responses for you. The current Amass MCP server exposes thirteen Core tools, plus `send_feedback` for reporting data problems (hosted installs may add a prefix like `mcp__claude_ai_Amass__`, but the base names are stable):
 
 | MCP tool | Wraps |
 | --- | --- |
 | `search_amass_biomedcore_records` | BiomedCore search (incl. author/institution filters) |
 | `get_amass_biomedcore_record` | BiomedCore get by Amass ID, PMID, **or** DOI (no separate lookup step; `includeFulltext` optional) |
 | `search_amass_trialcore_records` | TrialCore search |
-| `get_amass_trialcore_record` | TrialCore get by Amass ID **or** NCT ID |
+| `get_amass_trialcore_record` | TrialCore get by Amass ID, NCT ID, **or** registry ID (ICTRP-native, for non-US trials) |
 | `search_amass_drugcore_records` | DrugCore search |
 | `get_amass_drugcore_record` | DrugCore get by Amass ID **or** ChEMBL ID (returns parent/children + all cross-links) |
 | `search_amass_regulatorycore_records` | RegulatoryCore search |
@@ -67,16 +67,18 @@ If Amass MCP tools are available in the environment, prefer those for search and
 | `get_amass_genecore_record` | GeneCore get by Amass ID **or** Ensembl gene ID (returns target intelligence + cross-links) |
 | `search_amass_patentcore_records` | PatentCore search *(preview)* — exposes a **subset** of the HTTP filters (`query`, `assignee`, `countryCode`, `cpcCodes`, `minCitedByCount`, `minPublicationDate`) |
 | `get_amass_patentcore_record` | PatentCore get by Amass ID **or** publication number *(preview)* |
+| `send_feedback` | Report a data problem in a Core to the Amass data team — a wrong/missing/outdated value (`DATA_QUALITY`), a search that missed records that clearly exist (`DATA_QUALITY`, with `query` and `expectedIds`), or a field/filter/cross-link that does not exist (`DATA_MODEL`). Optional, never needed to answer a question, and Amass-Core-only — not for web or third-party results. Returns a receipt id. |
 
-Three MCP-specific behaviors to know:
-- Searches return **up to 10 records** (no `limit` parameter — run more, narrower searches for coverage).
-- The `get_*` tools accept external IDs directly (PMID/DOI, NCT, ChEMBL, FDA/EMA identifiers, patent publication number), so you never need the REST lookup endpoint over MCP for those. **Exceptions:** `get_amass_genecore_record` takes only an Amass ID or Ensembl gene ID — for any other gene identifier (HGNC, Entrez, UniProt, symbol, OMIM, Orphanet, IUPHAR) use the HTTP lookup endpoint; `get_amass_patentcore_record` takes only an Amass ID or publication number — to resolve an `applicationNumber` or `familyId` (one-to-many) use the HTTP lookup endpoint. TrialCore MCP get takes an Amass ID or NCT ID — resolve an ICTRP `registryId` via the HTTP lookup endpoint.
+MCP-specific behaviors to know:
+- Searches take a `limit` of **1–50, defaulting to 10**. No search returns a `total`, so a full page never proves the set is complete — for coverage, run more, narrower searches as well as raising `limit`.
+- BiomedCore, TrialCore, and RegulatoryCore search take `minLastUpdateDate` and `minCreateDate` — when Amass last wrote a record, and when it first ingested one. Use them for "what changed since I last looked" and "what is new in Amass", independent of publication, trial-start, or authorization dates.
+- The `get_*` tools accept external IDs directly (PMID/DOI, NCT, ChEMBL, FDA/EMA identifiers, patent publication number), so you never need the REST lookup endpoint over MCP for those. **Exceptions:** `get_amass_genecore_record` takes only an Amass ID or Ensembl gene ID — for any other gene identifier (HGNC, Entrez, UniProt, symbol, OMIM, Orphanet, IUPHAR) use the HTTP lookup endpoint; `get_amass_patentcore_record` takes only an Amass ID or publication number — to resolve an `applicationNumber` or `familyId` (one-to-many) use the HTTP lookup endpoint. TrialCore MCP get takes an Amass ID, NCT ID, or ICTRP `registryId` directly.
 - The MCP RegulatoryCore *search* does **not** return `documentSections`/`matchedText` (the HTTP search does). To read label/SmPC/review/EPAR text over MCP, use `get_amass_regulatorycore_record` for the section table of contents, then `get_amass_regulatorycore_document_section` to fetch a section's full text. The HTTP path additionally lets you scope a full-text search to one record with `&amassId=AMRC_…` and get `matchedText` excerpts back.
 - The MCP PatentCore *search* exposes only a subset of the HTTP filters — for `ipcCodes`, `kindCode`, `language`, `inventor`, `hasClaims`/`hasDescription`, the filing/grant/priority date ranges, or the `include` flags (`claims`, `description`, `nplCitations`, `citedByPatents`, `referencesDrugCore`, `referencesBiomedCore`), fall back to HTTP.
 
 Fall back to direct HTTP via `curl` (Bash tool) or `requests` (Python) when:
 
-- You need something the MCP doesn't expose (`limit` > 10, an `include` flag like `outcomes` or `authorsMetadata` on search, `minCitationCount`, `sponsorType`, `facilityCountries`, a gene identifier other than Ensembl, a trial `registryId`, a patent `applicationNumber` / `familyId`, PatentCore's HTTP-only filters, batch lookup of many IDs at once)
+- You need something the MCP doesn't expose (`limit` > 50, `maxLastUpdateDate`, an `include` flag like `outcomes` or `authorsMetadata` on search, `minCitationCount`, `sponsorType`, `facilityCountries`, a gene identifier other than Ensembl, a patent `applicationNumber` / `familyId`, PatentCore's HTTP-only filters, batch lookup of many IDs at once)
 - The MCP server is not connected
 - You're running this skill non-interactively from a script
 
