@@ -85,7 +85,7 @@ it. `search_*` returns up to `limit` full records per call (1–50, default 10);
 | **Druggable** | GeneCore | search filter | `isDruggable=true` (any small-molecule or antibody bucket satisfied) |
 | **Modality tractability** | GeneCore | search filter + record | `tractabilityModality`, `tractabilityStage`; read `tractability.{smallMolecule\|antibody\|protac\|otherClinical}` → each has a `clinical` lane (real clinical precedent) and a `predictive` lane (computational) |
 | **Target class** | GeneCore | search filter + record | `targetClass=[ENZYME\|MEMBRANE_RECEPTOR\|ION_CHANNEL\|…]`; read `targetClass.path` (full ChEMBL class path) |
-| **Genetic constraint** | GeneCore | search filter + record | `maxConstraintLoeuf`; read `gnomadConstraint.lossOfFunction.loeuf` (lower = more LoF-intolerant; gnomAD v4 constrained ≈ < 0.6) |
+| **Genetic constraint** | GeneCore | search filter + record | `maxConstraintLoeuf`; read `gnomadConstraint.lossOfFunction.loeuf` (lower = more LoF-intolerant; gnomAD v4.1.1 constrained ≈ < 0.45) |
 | **Essentiality** | GeneCore | search filter + record | `isEssential`; read `depmapEssentiality.isEssential` and `meanGeneEffect` (more negative = stronger CRISPR dependency) |
 | **Safety liabilities** | GeneCore | search filter + record | `hasSafetyLiabilities`; read `safetyLiabilities[].event` (curated Open Targets/ClinPGx signals) |
 | **Biotype** | GeneCore | search filter + record | `geneType` (`PROTEIN_CODING`, `NCRNA`, …) |

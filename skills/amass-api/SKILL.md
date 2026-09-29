@@ -9,14 +9,14 @@ A skill for querying the Amass API at `https://api.amass.tech/api/v1` to answer 
 
 The Amass platform exposes six domain-specific datasets ("Cores") over a REST API:
 
-- **BiomedCore** — biomedical papers (40M+ PubMed/PMC citations, plus fulltext, citation counts, journal quality scores, MeSH terms, author/institution metadata, intra-core citation graph)
+- **BiomedCore** — biomedical papers (43M+ PubMed/PMC citations plus conference abstracts from society meetings, with fulltext, citation counts, journal quality scores, MeSH terms, author/institution metadata, intra-core citation graph)
 - **TrialCore** — clinical trials (1.2M+ records from ClinicalTrials.gov **and** the WHO ICTRP — non-US registries such as EUCTR, ChiCTR, JPRN, ISRCTN; with phases, status, sponsors, outcomes, arms, facility countries, and `registryId` / `sourceRegistry` / `sourceUrl` provenance)
 - **DrugCore** — drugs and molecules (22K+ ChEMBL-derived records: names, trade names, synonyms, modality, clinical stage, structure, mechanisms of action, parent/child hierarchy)
 - **RegulatoryCore** — FDA + EMA drug authorizations on a shared schema (unified status, procedure type, designations), plus the parsed full text of every FDA label, FDA review, EMA SmPC, and EMA EPAR
 - **GeneCore** — genes / drug targets (43K+ records harmonized from HGNC, NCBI, UniProt, Open Targets: symbols, synonyms, gene families, biotype, RefSeq summaries, external IDs, plus drug-target intelligence — druggability/tractability, target safety, ChEMBL target class, gnomAD genetic constraint, DepMap essentiality, and a UniProt protein-annotation block)
 - **PatentCore** *(preview)* — patent publications (bibliographic metadata, English-preferred full text — title/abstract/claims/description, CPC/IPC classifications, inventors/assignees, key dates, and citation lineage; full-text search with structured filters, collapsing each family to its most relevant publication)
 
-Records are cross-linked across Cores: papers ↔ trials, drugs ↔ trials, drugs → papers/authorizations, authorizations → active ingredients, each authorization → its other-market counterpart, genes ↔ drugs (a gene knows its targeting drugs; a drug knows its target genes), and patents → drugs/papers.
+Records are cross-linked across Cores: papers ↔ trials, drugs ↔ trials, drugs → papers/authorizations, authorizations → active ingredients, each authorization → the same product's other authorizations (either agency), genes ↔ drugs (a gene knows its targeting drugs; a drug knows its target genes), and patents → drugs/papers.
 
 The full API reference is bundled in `AMASS.md` (a snapshot of <https://platform.amass.tech/markdown>). Read it on demand — it's self-contained and includes exhaustive field lists, filter enums, and example requests. If a request behaves contrary to `AMASS.md` (e.g. a 400 cites a filter or value the snapshot doesn't list), the live docs may have moved on — fetch them and reconcile.
 
@@ -37,7 +37,7 @@ Use this skill for **any** biomedical literature, clinical trial, drug, regulato
 - "Which drugs carry a breakthrough-therapy designation in oncology?" → RegulatoryCore search with `hasDesignation`
 - "What does the Keytruda label say about immune-mediated hepatitis?" → RegulatoryCore full-text search (scoped with `amassId`), then fetch the matching document section
 - "Is KRAS a druggable target, and how far along is it?" → GeneCore search with `isDruggable=true` (read `tractability`)
-- "Find LoF-constrained kinases with an approved small-molecule precedent" → GeneCore search with `targetClass=ENZYME`, `tractabilityModality=SMALL_MOLECULE`, `tractabilityStage=APPROVED_DRUG`, `maxConstraintLoeuf=0.6`
+- "Find LoF-constrained kinases with an approved small-molecule precedent" → GeneCore search with `targetClass=ENZYME`, `tractabilityModality=SMALL_MOLECULE`, `tractabilityStage=APPROVED_DRUG`, `maxConstraintLoeuf=0.45`
 - "What's the target safety profile of JAK2?" → GeneCore lookup/get, read `safetyLiabilities`
 - "Which drugs target EGFR?" → GeneCore get-by-ID with `include=referencesDrugCore`, then DrugCore get-by-ID for each AMDC ID
 - "What gene does sotorasib target, and is that target essential?" → DrugCore get-by-ID with `include=referencesGeneCore`, then GeneCore get-by-ID (read `depmapEssentiality`)
@@ -71,7 +71,8 @@ If Amass MCP tools are available in the environment, prefer those for search and
 
 MCP-specific behaviors to know:
 - Searches take a `limit` of **1–50, defaulting to 10**. No search returns a `total`, so a full page never proves the set is complete — for coverage, run more, narrower searches as well as raising `limit`.
-- BiomedCore, TrialCore, and RegulatoryCore search take `minLastUpdateDate` and `minCreateDate` — when Amass last wrote a record, and when it first ingested one. Use them for "what changed since I last looked" and "what is new in Amass", independent of publication, trial-start, or authorization dates.
+- BiomedCore, TrialCore, RegulatoryCore, and GeneCore search take `minLastUpdateDate` and `minCreateDate` — when Amass last wrote a record, and when it first ingested one. Use them for "what changed since I last looked" and "what is new in Amass", independent of publication, trial-start, or authorization dates. GeneCore refreshes weekly, and `get_amass_genecore_record` (not search) returns `lastUpdateDate`.
+- Search and get results on every Core carry a `url` linking to the record's source — use it to cite. Its target may change, so build links to a specific system from the identifier fields (`amassId`, `pmid`, `doi`, `nctId`, `chemblId`, …).
 - The `get_*` tools accept external IDs directly (PMID/DOI, NCT, ChEMBL, FDA/EMA identifiers, patent publication number), so you never need the REST lookup endpoint over MCP for those. **Exceptions:** `get_amass_genecore_record` takes only an Amass ID or Ensembl gene ID — for any other gene identifier (HGNC, Entrez, UniProt, symbol, OMIM, Orphanet, IUPHAR) use the HTTP lookup endpoint; `get_amass_patentcore_record` takes only an Amass ID or publication number — to resolve an `applicationNumber` or `familyId` (one-to-many) use the HTTP lookup endpoint. TrialCore MCP get takes an Amass ID, NCT ID, or ICTRP `registryId` directly.
 - The MCP RegulatoryCore *search* does **not** return `documentSections`/`matchedText` (the HTTP search does). To read label/SmPC/review/EPAR text over MCP, use `get_amass_regulatorycore_record` for the section table of contents, then `get_amass_regulatorycore_document_section` to fetch a section's full text. The HTTP path additionally lets you scope a full-text search to one record with `&amassId=AMRC_…` and get `matchedText` excerpts back.
 - The MCP PatentCore *search* exposes only a subset of the HTTP filters — for `ipcCodes`, `kindCode`, `language`, `inventor`, `hasClaims`/`hasDescription`, the filing/grant/priority date ranges, or the `include` flags (`claims`, `description`, `nplCitations`, `citedByPatents`, `referencesDrugCore`, `referencesBiomedCore`), fall back to HTTP.
@@ -131,7 +132,7 @@ Multi-value semantics everywhere: **repeat a filter to OR within it; combine dif
 - "Well-cited" → `minCitationCount=10` (or higher for broad topics)
 - "Not retracted" → `isRetracted=false`
 - "High-impact" / "top journals" → `minJournalQualityJufo=2` (domain-leading) or `3` (highest). **Caveat:** JuFo is the Finnish ranking; many legitimate journals are unranked (`null`) and are excluded by any min filter. For a general "high impact" gate, prefer `minCitationCount`.
-- "By author X" / "from institution Y" → `authorNames` / `authorOrcids` / `institutionNames` / `institutionRors` (repeatable, OR within each). Name matching is free-text token — use the most distinctive token (last name, institution head noun) and pair with `include=authorsMetadata` to verify the match. Note `authorNames=X&institutionNames=Y` means *some* author X AND *some* affiliation Y — not necessarily the same person.
+- "By author X" / "from institution Y" → `authorNames` / `authorOrcids` / `institutionNames` / `institutionRors` (repeatable, OR within each). A two-part author name (`David Liu`, or the citation form `Liu DR`) must match a single author, so it is precise; the surname alone is the widest match. `institutionNames` matches both the normalized institution and the raw affiliation line. `authorOrcids` / `institutionRors` return a 400 for values that aren't identifiers — names go in `authorNames` / `institutionNames`. Pair with `include=authorsMetadata` to verify the match. Note `authorNames=X&institutionNames=Y` means *some* author X AND *some* affiliation Y — not necessarily the same person.
 
 **TrialCore:**
 - "Recruiting" / "enrolling" → `overallStatus=RECRUITING`
@@ -143,7 +144,7 @@ Multi-value semantics everywhere: **repeat a filter to OR within it; combine dif
 - "Has results posted" → `hasResults=true`
 - Date windows → `minStartDate` / `maxStartDate` / `minCompletionDate` / `maxCompletionDate`
 - "Large trial" → `minEnrollment=500`
-- Coverage now spans **non-US** registries (WHO ICTRP: EUCTR, ChiCTR, JPRN, ISRCTN, …). These records have a **null `nctId`** — read `registryId` (native source ID), `sourceRegistry`, and `sourceUrl` for identity and provenance, and link/cite non-US trials by `sourceUrl`
+- A trial ID from any registry, or a sponsor development code (`LY3298176`), in `query` returns the matching trials first. EU trials register once per country; search returns one row per trial, while lookup by a bare EudraCT number (`EUCTR2013-000487-28`) returns every country's registration
 
 **DrugCore:**
 - "Antibody" / "small molecule" / "gene therapy" → `drugType=ANTIBODY` etc.
@@ -165,7 +166,7 @@ Multi-value semantics everywhere: **repeat a filter to OR within it; combine dif
 - "Kinase" / "GPCR" / "ion channel" / "transcription factor" → `targetClass=ENZYME`/`MEMBRANE_RECEPTOR`/`ION_CHANNEL`/`TRANSCRIPTION_FACTOR` etc. (top-level ChEMBL class only — the full path is still returned). Concept words also work in free-text `query`
 - "Protein-coding" / "non-coding RNA" / "pseudogene" → `geneType=PROTEIN_CODING`/`NCRNA`/`PSEUDO` etc. (repeat to OR)
 - "Has known target-safety signals" → `hasSafetyLiabilities=true` (read events from `safetyLiabilities`)
-- "Loss-of-function constrained" / "intolerant to LoF" → `maxConstraintLoeuf=0.6` (lower LOEUF = more constrained; 0.6 is the gnomAD v4.0 cutoff)
+- "Loss-of-function constrained" / "intolerant to LoF" → `maxConstraintLoeuf=0.45` (lower LOEUF = more constrained; 0.45 is gnomAD's v4.1.1 cutoff)
 - "Essential gene" / "DepMap dependency" → `isEssential=true`
 - Query by gene symbol, name, synonym, or functional concept ("tyrosine kinase", "apoptosis") — search matches symbols, names, synonyms, gene families, RefSeq summaries, UniProt keywords, and ChEMBL target class, **not** drug names
 
@@ -260,11 +261,11 @@ After fetching, don't dump the raw JSON. Summarise:
 - For **search results**: lead with the top 3–5 most relevant records. Include title/name, journal/sponsor/holder, date, and one line on why it's relevant. Offer to fetch fulltext, document sections, or more results if useful.
 - For **a single record**: give a brief summary (papers: title, authors, journal, date; trials: phase, status, sponsor, enrollment, design; drugs: name, modality, clinical stage; authorizations: agency, status, indication, holder; genes: symbol, name, biotype, and — for targets — druggability, target class, and key constraint/safety/essentiality signals; patents: title, publication number, assignees, key dates, jurisdiction) and then answer the user's specific question using the record's fields.
 - Always include the canonical identifier (PMID/DOI for papers, NCT ID — or `registryId` + `sourceRegistry` for non-US trials — for trials, ChEMBL ID for drugs, FDA application number / EMA product number for authorizations, gene symbol + Ensembl gene ID for genes, publication number for patents) so the user can verify or cite.
-- Link out when useful:
+- Link out when useful. Every record's `url` is the default source link; build these when you need a specific system:
   - PubMed: `https://pubmed.ncbi.nlm.nih.gov/{pmid}/`
   - PMC fulltext: `https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/`
   - DOI: `https://doi.org/{doi}`
-  - ClinicalTrials.gov: `https://clinicaltrials.gov/study/{nctId}` (for non-US trials with no `nctId`, use the record's `sourceUrl`)
+  - ClinicalTrials.gov: `https://clinicaltrials.gov/study/{nctId}` (for non-US trials with no `nctId`, use the record's `url`)
   - ChEMBL: `https://www.ebi.ac.uk/chembl/explore/compound/{chemblId}`
   - Regulatory source page / PDFs: the record's `sourceUrl`, `fdaDetails.labelUrl`, `emaDetails.smpcUrl`
   - Ensembl gene: `https://www.ensembl.org/Homo_sapiens/Gene/Summary?g={ensemblGeneId}`
@@ -293,7 +294,7 @@ GET /cores/biomedcore/records?query=<topic>&minPublicationDate=<date>&minCitatio
 
 **Papers by an author at an institution:**
 ```
-GET /cores/biomedcore/records?query=<topic>&authorNames=<lastname>&institutionNames=<inst>&include=authorsMetadata&limit=20
+GET /cores/biomedcore/records?query=<topic>&authorNames=<full name or surname>&institutionNames=<inst>&include=authorsMetadata&limit=20
 ```
 
 **Recruiting Phase 3 drug trials:**
@@ -389,7 +390,7 @@ GET /cores/genecore/records?query=<concept>&targetClass=ENZYME&tractabilityModal
 
 **LoF-constrained or essential targets:**
 ```
-GET /cores/genecore/records?query=<concept>&maxConstraintLoeuf=0.6&limit=20      (constrained)
+GET /cores/genecore/records?query=<concept>&maxConstraintLoeuf=0.45&limit=20     (constrained)
 GET /cores/genecore/records?query=<concept>&isEssential=true&limit=20            (DepMap-essential)
 ```
 

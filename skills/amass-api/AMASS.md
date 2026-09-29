@@ -1,6 +1,6 @@
 # Amass API Reference
 
-> Snapshot of <https://platform.amass.tech/markdown> as of 2026-07-04.
+> Snapshot of <https://platform.amass.tech/markdown> as of 2026-09-29.
 > If a request behaves contrary to what's documented here (e.g. a 400 cites a filter or value this file doesn't list), fetch the live page to check whether the API has moved on.
 
 Base URL: `https://api.amass.tech/api/v1`
@@ -12,7 +12,7 @@ Base URL: `https://api.amass.tech/api/v1`
 Every Core follows the same three-endpoint pattern: search, get-by-ID, batch lookup.
 
 ### BiomedCore — `/cores/biomedcore`
-- `GET  /records` — search biomedical literature (40M+ PubMed/PMC citations)
+- `GET  /records` — search biomedical literature (43M+ PubMed/PMC citations and conference abstracts)
 - `GET  /records/{amassId}` — fetch a single record (Amass ID starts `AMBC_`)
 - `POST /records/lookup` — convert PMIDs/DOIs to Amass IDs
 
@@ -128,10 +128,10 @@ This applies to BiomedCore's author/institution filters, TrialCore's enum filter
 | `isRetracted` | bool | `true` / `false` |
 | `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the publication date. Records with no update date are excluded |
 | `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |
-| `authorOrcids` | string (repeatable) | Match ANY. Bare (`0000-0003-1234-5678`) or URL form |
-| `authorNames` | string (repeatable) | Match ANY. Free-text token (PubMed indexes `LastName Initials`, e.g. `Liu DR` — last-name token is safest) |
-| `institutionRors` | string (repeatable) | Match ANY. Bare (`03vek6s52`) or URL form |
-| `institutionNames` | string (repeatable) | Match ANY. Free-text token |
+| `authorOrcids` | string (repeatable) | Match ANY. Bare (`0000-0003-1234-5678`) or URL form; a value that is not an ORCID is a `400`, not an empty result |
+| `authorNames` | string (repeatable) | Match ANY. Free-text token match (no prefix expansion). A two-part name must be carried by a single author, in either order (`David Liu` finds `David R. Liu`); the citation form (`Liu DR`, upper-case initials) also matches. The surname alone is the widest match |
+| `institutionRors` | string (repeatable) | Match ANY. Bare (`03vek6s52`) or URL form; a value that is not a ROR ID is a `400`, not an empty result |
+| `institutionNames` | string (repeatable) | Match ANY. Free-text token match against both the normalized institution name and the affiliation line printed on the paper |
 
 `include` is repeatable: `?include=fulltext&include=referencesTrialCore`. Pair author/institution filters with `include=authorsMetadata` to verify the match.
 
@@ -156,14 +156,16 @@ amassId               string         AMBC_… canonical ID
 pmid                  string|null    PubMed ID
 pmcid                 string|null    PubMed Central ID
 doi                   string|null
+url                   string|null    Link to the source of the record. Target may change — build links to a specific system from amassId/pmid/doi/pmcid
 title                 string|null
 abstract              string|null
 authors               string[]       e.g. ["Smith J", "Doe A"]
 journal               string|null
 issn                  string|null
 volumeIssue           string|null
-publicationDate       string|null    ISO date
-publicationTypes      string[]       e.g. ["Journal Article", "Review"]
+publicationDate       string|null    ISO date: electronic publication date when PubMed has one, otherwise the journal issue date
+lastUpdateDate        string|null    ISO date Amass last wrote the record
+publicationTypes      string[]       NLM MeSH types, e.g. ["Journal Article", "Review"]; conference abstracts also carry the Amass-assigned `Conference`, appended last
 language              string|null    e.g. "eng"
 citationCount         number|null
 journalQualityJufo    number|null    See JuFo tiers
@@ -185,6 +187,8 @@ referencesTrialCore   string[]            AMTC_… IDs of trials referenced by t
 references            string[]            AMBC_… IDs of papers this one cites
 citedBy               string[]            AMBC_… IDs of papers that cite this one
 ```
+
+**Conference abstracts.** BiomedCore also holds abstracts presented at society meetings, marked by `Conference` in `publicationTypes` (not an NLM value).
 
 `references` and `citedBy` form an intra-BiomedCore citation graph. `referencesTrialCore` is the cross-core link to TrialCore.
 
@@ -259,6 +263,8 @@ Items fail independently — always check each result for an `error` field befor
 | `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the registration or start date. Records with no update date are excluded |
 | `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |
 
+`query` does more than keyword matching. A trial ID from any registry (NCT, EUCTR, CTIS, ChiCTR, ISRCTN, ACTRN, JPRN, …; casing ignored) returns that trial first, and a sponsor development code returns the trials carrying it (including in `orgStudyId` / `secondaryIds`) ahead of keyword hits. Sponsor, collaborator and site names are searched, and a target or therapy class (`BCMA`, `STING`) reaches trials whose interventions resolve to it. EUCTR registers a trial once per country; search returns it **once** (best-matching country) and `limit` counts distinct trials.
+
 ---
 
 ## TrialCore — record schema
@@ -268,9 +274,10 @@ Items fail independently — always check each result for an `error` field befor
 ```
 amassId                      string         AMTC_… canonical ID
 nctId                        string|null    ClinicalTrials.gov identifier. Null for non-US (ICTRP) trials
-registryId                   string|null    Source-registry native ID. Equals nctId for CT.gov; the registry-native ID (e.g. EUCTR2021-000123-45, ChiCTR2400012345) for WHO ICTRP trials. Populated for every record
+registryId                   string|null    Source-registry native ID. Equals nctId for CT.gov; the registry-native ID (e.g. EUCTR2013-000487-28-DE, ChiCTR2400080025) for WHO ICTRP trials. EUCTR values always carry a country suffix. Populated for every record
 sourceRegistry               string|null    Registry the record came from: clinicaltrials_gov, euctr, ctis, chictr, isrctn, anzctr, jprn, ctri, drks, …
 sourceUrl                    string|null    Link to the trial on its source registry
+url                          string|null    Link to the source of the record. Today equals sourceUrl, falling back to the WHO ICTRP record page; target may change
 briefTitle                   string|null
 officialTitle                string|null
 briefSummary                 string|null
@@ -280,7 +287,7 @@ overallStatus                string|null
 studyType                    string|null
 startDate                    string|null    ISO date
 completionDate               string|null    ISO date
-lastUpdateDate               string|null    ISO date
+lastUpdateDate               string|null    ISO date Amass last wrote the record (not a registry date)
 hasResults                   boolean
 enrollment                   number|null
 enrollmentType               string|null    "ACTUAL" | "ESTIMATED"
@@ -363,12 +370,12 @@ referencesDrugCore       string[]      AMDC_… IDs of drugs studied by this tri
 {
   "items": [
     {"nctId": "NCT06012345"},
-    {"registryId": "EUCTR2021-000123-45"}
+    {"registryId": "EUCTR2013-000487-28-DE"}
   ]
 }
 ```
 
-**Constraint:** each item must contain exactly one of `nctId` or `registryId`. Use `registryId` (the source-registry native ID) to resolve non-US (ICTRP) trials, which have no `nctId`. Same response shape as BiomedCore lookup; items fail independently.
+**Constraint:** each item must contain exactly one of `nctId` or `registryId`. Use `registryId` (the source-registry native ID) to resolve non-US (ICTRP) trials, which have no `nctId`. `registryId` matching ignores casing. A bare EudraCT number without its country suffix (`EUCTR2013-000487-28`) resolves to **every** country's registration (up to 32, differing on enrollment, sponsor, status and `hasResults`), so pass the full `registryId` when you mean one. Same response shape as BiomedCore lookup; items fail independently.
 
 ---
 
@@ -393,9 +400,10 @@ Search matches drug names, trade names, synonyms, and descriptions — query by 
 ```
 amassId            string         AMDC_… canonical ID
 chemblId           string|null    ChEMBL molecule ID
+url                string|null    Link to the source of the record (null without chemblId); target may change
 name               string|null    Primary drug name
 description        string|null    Free-text description (clinical stage, indications)
-synonyms           string[]       Alternative names
+synonyms           string[]       Alternative names (names belonging to other DrugCore records are excluded)
 tradeNames         string[]       Brand / trade names
 drugType           string|null    Modality, e.g. SMALL_MOLECULE, ANTIBODY
 maxClinicalStage   string|null    Highest stage reached, e.g. PHASE3, APPROVAL
@@ -466,7 +474,7 @@ One record = one authorization (FDA or EMA). `query` matches the structured meta
 amassId                        string        AMRC_… canonical ID
 agency                         string        FDA | EMA
 name                           string|null   Primary product / brand name
-activeSubstance                string|null
+activeSubstance                string|null   Active ingredients. FDA joins every active with `;`; EMA values pass through unnormalized
 moleculeType                   string|null   Projected from DrugCore
 authorizationStatus            string|null   Unified FDA + EMA status
 procedureType                  string|null   FDA: NDA | BLA | ANDA | UNKNOWN; EMA: CENTRALISED_HUMAN, WITHDRAWAL_HUMAN, CENTRALISED_VETERINARY, WITHDRAWAL_VETERINARY, UNKNOWN
@@ -474,11 +482,12 @@ therapeuticIndication          string|null
 marketingAuthorisationHolder   string|null
 authorizationDate              string|null   ISO date (FDA approval / EMA MA grant)
 firstAuthorizationDate         string|null
-lastUpdateDate                 string|null
+lastUpdateDate                 string|null   When Amass last wrote the record — not an agency date. A document-section revision alone does not move it
 sourceUrl                      string|null   Agency landing page
+url                            string|null   Link to the source of the record. Today equals sourceUrl; target may change
 isOrphan                       boolean|null
 designations                   object[]      See designations shape
-authorizationsByAgency         object[]      Cross-market link — always populated, cannot be suppressed
+authorizationsByAgency         object[]      Same-product link, either agency — always populated, cannot be suppressed
 documentSections               object[]      Search: match evidence w/ matchedText. Get-by-ID: full content-free TOC. Always populated
 ```
 
@@ -517,7 +526,7 @@ The `axis` puts agency-native programs on shared comparison axes so FDA and EMA 
 }
 ```
 
-Lists the same product's other-market authorizations (self excluded), each with its own status — cross-market status divergence (active in US, withdrawn in EU) reads straight off one response.
+Lists every other authorization of the same product at **either** agency (self excluded), each with its own status — cross-market status divergence (active in US, withdrawn in EU) reads straight off one response. Filter entries on `agency` if you track one market. Products link even when agencies spell the name differently (`TRIKAFTA (COPACKAGED)` ↔ `Kaftrio`), as long as they share a drug molecule, so expect more than one entry.
 
 ### `documentSections` shape
 
@@ -608,7 +617,9 @@ Keyword search across gene symbols, names, synonyms, gene families, RefSeq funct
 | `tractabilityModality` | enum (repeatable) | `SMALL_MOLECULE`, `ANTIBODY`, `PROTAC`, `OTHER_CLINICAL`. Alone matches any stage |
 | `tractabilityStage` | enum (repeatable) | `APPROVED_DRUG`, `ADVANCED_CLINICAL`, `PHASE_1_CLINICAL`. Alone matches any modality |
 | `hasSafetyLiabilities` | bool | `true` keeps genes with ≥ 1 curated Open Targets safety liability |
-| `maxConstraintLoeuf` | number | Keep genes with gnomAD v4.0 LOEUF ≤ this value (lower = more loss-of-function-constrained) |
+| `maxConstraintLoeuf` | number | Keep genes with gnomAD v4.1.1 LOEUF ≤ this value (lower = more loss-of-function-constrained) |
+| `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the gene — any ingested change counts (HGNC edit, target-intelligence, protein, RefSeq summary, drug link). Genes refresh weekly. Records with no update date are excluded |
+| `minCreateDate` | ISO date | When Amass first ingested the gene. Records with no create date are excluded |
 
 `tractabilityModality` and `tractabilityStage` combine as a cross-product where an omitted dimension means "any" (`tractabilityModality=SMALL_MOLECULE` alone matches any clinical stage; add `tractabilityStage=APPROVED_DRUG` to require a stage). Only the three clinical-precedent stages are filterable — the predictive lane is returned but not filterable. `isDruggable=true` is shorthand for "any satisfied small-molecule or antibody bucket".
 
@@ -629,6 +640,7 @@ Keyword search across gene symbols, names, synonyms, gene families, RefSeq funct
 ```
 amassId            string         AMGC_… canonical ID
 ensemblGeneId      string|null    Ensembl stable gene ID (e.g. ENSG00000141510)
+url                string|null    Link to the source of the record; target may change
 symbol             string|null    Approved gene symbol (e.g. TP53)
 name               string|null    Full gene name
 synonyms           string[]       Alternative symbols / aliases
@@ -645,10 +657,11 @@ maneSelect         string[]       MANE Select transcript id(s) (RefSeq + Ensembl
 omimId             string[]       OMIM id(s) for associated Mendelian disease/phenotype
 orphanet           string|null    Orphanet rare-disease ID
 iuphar             string|null    IUPHAR/Guide to Pharmacology target ID
+lastUpdateDate     string|null    ISO date Amass last wrote the gene (not an HGNC date)
 tractability       object|null    Druggability buckets by modality (see below)
 safetyLiabilities  object[]|null  Curated target-safety signals (see below)
 targetClass        object|null    ChEMBL target-class path + leaf id (see below)
-gnomadConstraint   object|null    gnomAD v4.0 gene-constraint summary (see below)
+gnomadConstraint   object|null    gnomAD v4.1.1 gene-constraint summary (see below)
 depmapEssentiality object|null    DepMap CRISPR dependency summary (see below)
 ```
 
@@ -694,7 +707,7 @@ lossOfFunction.pli          pLI — probability of loss-of-function intolerance
 lossOfFunction.loeufDecile  LOEUF decile (0 = most-constrained 10% of genes)
 lossOfFunction.loeufRank    Genome-wide LOEUF rank (lower = more constrained)
 ```
-gnomAD v4.0 constrained-gene cutoffs: **LOEUF < 0.6** (distribution shifted from < 0.35 in v2.1.1), or **pLI ≥ 0.9**, or the first LOEUF decile. Filter with `maxConstraintLoeuf` (a lower bound selects more-constrained genes).
+gnomAD v4.1.1 constrained-gene cutoff: **LOEUF < 0.45** (most constrained 15%; < 0.6 is the most constrained 25%, and v2.1.1's < 0.35 selects fewer). pLI ≥ 0.9 is widely used, but gnomAD recommends the LOEUF cutoff instead — pLI can differ sharply between gnomAD versions. Filter with `maxConstraintLoeuf` (a lower bound selects more-constrained genes).
 
 **`depmapEssentiality`**
 ```
@@ -793,6 +806,7 @@ Search returns one publication per family (the most relevant member), so a lands
 ```
 amassId                   string         AMPC_… canonical ID
 publicationNumber         string|null    Source-neutral identity key, e.g. US-10266485-B2
+url                       string|null    Link to the source of the record (null without publicationNumber); target may change
 applicationNumber         string|null
 countryCode               string|null    Jurisdiction / patent-office code, e.g. US, EP, WO
 kindCode                  string|null    Document type/stage, e.g. A1, B2
@@ -867,7 +881,7 @@ referencesBiomedCore  string[]       AMBC_… IDs of the papers this patent cite
 | Drug → papers | `referencesBiomedCore` | `include=referencesBiomedCore` | `AMBC_…` IDs |
 | Drug → authorizations | `referencesRegulatoryCore` | `include=referencesRegulatoryCore` | `AMRC_…` IDs |
 | Authorization → active ingredients | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
-| Authorization → other-market authorizations | `authorizationsByAgency` | always present | `AMRC_…` IDs + status |
+| Authorization → same-product authorizations (either agency) | `authorizationsByAgency` | always present | `AMRC_…` IDs + status |
 | Drug → genes (targets) | `referencesGeneCore` | `include=referencesGeneCore` | `AMGC_…` IDs |
 | Gene → drugs | `referencesDrugCore` | `include=referencesDrugCore` | `AMDC_…` IDs |
 | Patent → prior patents (cites) | `citedPatents` | always present | `AMPC_…` IDs |
@@ -920,6 +934,8 @@ When you get a 400, read `error.fields` before retrying — it tells you exactly
 
 ## Useful external links from a record
 
+Every Core's records carry a default `url` linking to the record's source — use it to cite a record. Its target may change over time, so don't parse identifiers out of it; build links AmassIds or to a specific system from the identifier fields:
+
 - PubMed: `https://pubmed.ncbi.nlm.nih.gov/{pmid}/`
 - PubMed Central: `https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/`
 - DOI: `https://doi.org/{doi}`
@@ -952,7 +968,7 @@ When you get a 400, read `error.fields` before retrying — it tells you exactly
 15. **`authorizationsByAgency` and `documentSections` are always present** on RegulatoryCore records — they cannot be requested or suppressed via `include`.
 16. **DrugCore `referencesBiomedCore` is sparse** — empty means "no links recorded," not "no evidence."
 17. **GeneCore target-intelligence objects are default but often `null`** — `tractability` / `safetyLiabilities` / `targetClass` / `gnomadConstraint` / `depmapEssentiality` come back without `include`, but are `null` for genes Open Targets doesn't cover (most non-protein-coding genes). `null` = "no data," not "not a target."
-18. **GeneCore LOEUF: lower = more constrained** — `maxConstraintLoeuf` selects *more* loss-of-function-constrained genes (gnomAD v4.0 cutoff < 0.6).
+18. **GeneCore LOEUF: lower = more constrained** — `maxConstraintLoeuf` selects *more* loss-of-function-constrained genes (gnomAD v4.1.1 cutoff < 0.45).
 19. **GeneCore search matches gene/target identity and function, not drug names** — for a drug, start in DrugCore and follow `referencesGeneCore` to its targets.
 20. **TrialCore covers non-US trials** — WHO ICTRP records (EUCTR, ChiCTR, JPRN, …) have a **null `nctId`**; use `registryId` to identify or look them up, and `sourceRegistry` / `sourceUrl` for provenance.
 21. **PatentCore is in preview** — its schema may still change; reconcile against the live docs if a field looks off.
