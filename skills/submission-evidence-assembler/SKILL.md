@@ -1,6 +1,6 @@
 ---
 name: submission-evidence-assembler
-description: Use when a regulatory medical writer names a single drug asset and needs a citation-auditable, Module-2.5-style evidence narrative — every pivotal Phase-3 trial for the asset, the published papers that describe each trial via Amass's referencesBiomedCore cross-core edge, and a canonical Amass-ID audit trail — with journalQualityJufo, retraction flag, and citation count on every cited paper. Output: a .docx evidence narrative grouped by trial plus an .xlsx trial×paper matrix. Triggers on "assemble the evidence base for <asset>", "build a Module 2.5 evidence summary for <drug>", "what published trial evidence supports <asset>'s submission".
+description: Use when a regulatory medical writer names a single drug asset and needs a citation-auditable, Module-2.5-style evidence narrative — every pivotal Phase-3 trial for the asset, the published papers that describe each trial via Amass's referencesBiomedCore cross-core edge, and a canonical Amass-ID audit trail — with journalQualityJufo, retraction flag, and citation count on every cited paper. Output — a .docx evidence narrative grouped by trial plus an .xlsx trial×paper matrix. Triggers on "assemble the evidence base for <asset>", "build a Module 2.5 evidence summary for <drug>", "what published trial evidence supports <asset>'s submission".
 license: Apache-2.0
 metadata: { author: amass, version: "0.1.0" }
 ---

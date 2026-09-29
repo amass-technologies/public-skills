@@ -47,8 +47,8 @@ Anchor example: `kol = "Mikhail Kosiborod"`, `context_query = "cardiometabolic h
 
 1. **Seed (author search — the SEED STEP ONLY).**
    `search_amass_biomedcore_records(query=<context_query>, authorNames=[<kol>])`
-   → up to 10 papers. `authorNames` matches any record with at least one author matching the token —
-   it is an ambiguous token-match with **no prefix expansion and no identity resolution**. Verify
+   → up to 10 papers. A two-part name must be carried by a single author (order ignored), but it is
+   still a token match with **no prefix expansion and no identity resolution** — a namesake matches. Verify
    the KOL actually appears in each returned record's `authors` list before keeping the row (on the
    anchor, all 10 carried Kosiborod). **Sample, not census** — this is the top-10 by relevance to
    the query, NOT the author's full bibliography. `limit` accepts 1–50 and defaults to the 10 this
@@ -98,7 +98,8 @@ referencesTrialCore_NCTs`.
 - **Token-budget overflow on a landmark paper.** Recover with a metadata-only read; keep the row.
   Documented fallback; not triggered on the anchor.
 - **Author returns thin or off-topic results.** `authorNames` is a token-match with no identity
-  resolution; a common name can pull a homonym's papers. Verify the KOL in each `authors` list; if
+  resolution; a common name can pull a namesake's papers. If the full name is thin, retry with the
+  citation form (`Kosiborod MN`) or the surname alone, the widest match. Verify the KOL in each `authors` list; if
   the corpus is review/consensus-heavy, triangulation will be thin — report that honestly rather
   than forcing trial links.
 - **JuFo gate under weak token match.** If you trust-gate the seed with `minJournalQualityJufo` and

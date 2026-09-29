@@ -2,8 +2,8 @@
 name: amass-biomedical-evidence-scout
 description: >
   Maps the biomedical evidence landscape for a drug, indication, mechanism, target, or clinical
-  question by searching BOTH peer-reviewed literature (Amass BiomedCore — 39M+ PubMed/PMC papers)
-  AND clinical trials (Amass TrialCore — 575K+ ClinicalTrials.gov trials), then synthesizes the
+  question by searching BOTH peer-reviewed literature (Amass BiomedCore — 43M+ PubMed/PMC papers and conference abstracts)
+  AND clinical trials (Amass TrialCore — 1.2M+ trials from ClinicalTrials.gov and the WHO ICTRP), then synthesizes the
   parallel publication and clinical-development picture into a researcher-friendly briefing.
   Trigger on phrases like "what's the evidence on X", "give me a landscape on X", "I'm writing a
   paper / proposal / pitch on X", "what trials are running for X", "is anyone developing X for Y",
@@ -91,13 +91,13 @@ Calls can fail — network blips, malformed queries, transient API errors. When 
 Before running anything, internalize the difference between the two cores. The skill's value depends on using each one for what it's good at.
 
 ### BiomedCore (papers) — `search_amass_biomedcore_records` / `get_amass_biomedcore_record`
-- **What's in it:** 39M+ PubMed/PMC citations with abstracts, fulltext where available, and reference graphs (`references`, `citedBy`).
-- **Filters available on search:** `minPublicationDate` (ISO date), `minJournalQualityJufo` (0=evaluated/below-peer-review, 1=peer-reviewed, 2=domain-leading, 3=highest), `isRetracted` (boolean), plus author/institution filters: `authorOrcids`, `authorNames`, `institutionRors`, `institutionNames` (each an array — OR within one filter, AND across filters; name matching is free-text token, so use the most distinctive token, e.g. a last name). The author filters are especially useful in late-phase enrichment: once Phase 1 surfaces a dominant lab, a follow-up search filtered to that author maps their output directly.
+- **What's in it:** 43M+ PubMed/PMC citations, plus conference abstracts (`Conference` in `publicationTypes`), with abstracts, fulltext where available, and reference graphs (`references`, `citedBy`).
+- **Filters available on search:** `minPublicationDate` (ISO date), `minJournalQualityJufo` (0=evaluated/below-peer-review, 1=peer-reviewed, 2=domain-leading, 3=highest), `isRetracted` (boolean), plus author/institution filters: `authorOrcids`, `authorNames`, `institutionRors`, `institutionNames` (each an array — OR within one filter, AND across filters; a two-part name must match a single author; the surname alone is the widest match). The author filters are especially useful in late-phase enrichment: once Phase 1 surfaces a dominant lab, a follow-up search filtered to that author maps their output directly.
 - **`get_amass_biomedcore_record`** automatically returns the cross-link and reference fields — `references`, `citedBy`, and `referencesTrialCore` (which trials this paper cites). Set `includeFulltext: true` only when the abstract suggests the fulltext is worth the token cost (it can be large).
 - **Use for:** mechanism, target validation, biomarker evidence, systematic reviews, meta-analyses, retrospective analyses, the "why" of biomedical claims.
 
 ### TrialCore (clinical trials) — `search_amass_trialcore_records` / `get_amass_trialcore_record`
-- **What's in it:** 575K+ ClinicalTrials.gov trials with protocol summaries, phase, status, sponsor, conditions, intervention names/types, enrollment, completion dates, facility countries, and `referencesBiomedCore` (which papers cite this trial).
+- **What's in it:** 1.2M+ trials from ClinicalTrials.gov and non-US registries via the WHO ICTRP (non-US trials have a null `nctId`; use `registryId`), with protocol summaries, phase, status, sponsor, conditions, intervention names/types, enrollment, completion dates, facility countries, and `referencesBiomedCore` (which papers cite this trial).
 - **Filters available (with full enum values).** Each enum filter accepts a single value or an array — arrays match ANY of the listed values (OR within one filter), while different filters combine with AND. `phase: ["PHASE2", "PHASE3"]` + `overallStatus: "RECRUITING"` = (Phase 2 OR Phase 3) AND recruiting.
   - `phase`: `EARLY_PHASE1`, `PHASE1`, `PHASE1/PHASE2`, `PHASE2`, `PHASE2/PHASE3`, `PHASE3`, `PHASE4`, `NA`
   - `overallStatus`: `RECRUITING`, `NOT_YET_RECRUITING`, `ENROLLING_BY_INVITATION`, `ACTIVE_NOT_RECRUITING`, `SUSPENDED`, `TERMINATED`, `COMPLETED`, `WITHDRAWN`, `UNKNOWN`, `WITHHELD`, `AVAILABLE`, `NO_LONGER_AVAILABLE`, `TEMPORARILY_NOT_AVAILABLE`, `APPROVED_FOR_MARKETING`
