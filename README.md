@@ -57,11 +57,12 @@ Browse the full library at <https://amass.tech/skills>.
 
 ## Packaged downloads
 
-Most agents install skills straight from source — via `npx skills` above, or by dropping a `SKILL.md` into the tool's skills directory. For tools that take a packaged file, prebuilt `.skill` (double-click to install in Claude) and `.zip` archives live in [`dist/`](dist):
+Most agents install skills straight from source — via `npx skills` above, or by dropping a skill's folder into the tool's skills directory. For tools that take a packaged file, prebuilt `.skill` (double-click to install in Claude) and `.zip` archives live in [`dist/`](dist):
 
 - [`amass-biomedical-evidence-scout.skill`](dist/amass-biomedical-evidence-scout.skill) / [`.zip`](dist/amass-biomedical-evidence-scout.zip)
+- [`amass-watchlist-monitor.skill`](dist/amass-watchlist-monitor.skill) / [`.zip`](dist/amass-watchlist-monitor.zip)
 
-Rebuild them from the current `SKILL.md` with `scripts/build-dist.sh`. Rerun it whenever a packaged skill changes, so the download never drifts behind the source.
+Each package holds the skill's whole folder: its `SKILL.md` plus any scripts, references and templates. Rebuild them from the committed sources with `scripts/build-dist.sh`. Rerun it whenever a packaged skill changes, so the download never drifts behind the source.
 
 ## Setup
 
