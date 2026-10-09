@@ -2954,7 +2954,7 @@ details summary{cursor:pointer;color:var(--ink2);font-size:14px;margin:6px 0}
 .muted{color:var(--muted);font-size:13px}.scope li{margin:4px 0}
 footer{margin-top:36px;color:var(--muted);font-size:12px;border-top:1px solid var(--grid);padding-top:12px}
 a{color:inherit}
-@media print{.page{max-width:none}.tablewrap{max-height:none;overflow:visible}details{display:block}details>summary{display:none}details>*{display:block}}
+@media print{.page{max-width:none}.tablewrap{max-height:none;overflow:visible}details{display:block}details>summary{display:none}details>*{display:block}.card,.tile,tr,svg{break-inside:avoid}h2,h3{break-after:avoid}th{position:static}}
 """
 
 
