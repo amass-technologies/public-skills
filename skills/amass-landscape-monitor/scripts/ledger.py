@@ -5,7 +5,7 @@
 
 Commands
   validate      check field.yaml and print what it holds
-  plan          print the query plan with a credit and context estimate
+  plan          print the query plan with a run-cap and context estimate
   start-run     open a baseline or update run (update applies the interval table)
   ingest        read JSON rows from stdin: upsert the ledger, log the call, diff, classify
   add-query     append a query to the plan (rewrites field.yaml)
@@ -1769,7 +1769,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if cap_hit and pass_name:
         print("  cap hit on a dated pass: the window holds more than one page of records matching loosely; in-scope ones "
               "rank first, the tail is filler. If many KNOWN in-scope records came back rewritten, that is a bulk "
-              "refresh: ask before splitting the query or re-fetching the in-scope records (1 credit each).")
+              "refresh: re-fetch the in-scope records when there are few, otherwise split the query by facet "
+              "(SKILL.md, Update), and say which you did.")
     elif cap_hit:
         print("  cap hit: the field is wider than this query; add narrower queries for this facet")
     if kind == "search" and args.query_id:
@@ -3331,7 +3332,7 @@ def build_parser() -> argparse.ArgumentParser:
         return sp
 
     add("validate", cmd_validate, "check field.yaml")
-    add("plan", cmd_plan, "print the plan with a credit and context estimate")
+    add("plan", cmd_plan, "print the plan with a run-cap and context estimate")
     sp = add("start-run", cmd_start_run, "open a baseline or update run")
     sp.add_argument("--mode", choices=("baseline", "update"), required=True)
     sp.add_argument("--core", action="append", help="restrict to these cores (repeatable)")
