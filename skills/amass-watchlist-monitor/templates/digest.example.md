@@ -47,5 +47,4 @@ replayed with --since 2026-07-07. Everything else is live output.
 - Records with substantive changes or removals: 2
 - Feed: 1 page(s), 3 event(s) on 3 record(s); 0 already reflected in the stored snapshots
 - Fetched: 3 record(s) (0 baseline, 3 with feed events); 0 removal(s) need no fetch
-- Credits spent: 4 credits ($0.04): feed pages 1, record GETs 3, lookups 0
 - Next expected refresh: 2026-10-06. TrialCore refreshes daily; a day's changes reach the feed about one day later.

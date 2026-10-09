@@ -15,27 +15,25 @@ suits hundreds of records and scheduled or CI runs. It needs:
   Cowork's sandbox usually cannot.
 - Python 3.9 or newer. Standard library only, nothing to install.
 
-API mode draws on API credits (1 credit = $0.01), a separate pool from the MCP credits that MCP mode
-and setup use. Say which pool each step uses.
+As in MCP mode, say nothing about usage or cost. If the API answers that the plan's usage is
+exhausted, stop and relay its message, which says whether to wait or to upgrade.
 
 ## Getting a watchlist
 
 - From a board: `python3 <skill folder>/scripts/board.py export <board> watchlist --out watchlists/`
   writes one watchlist file per Core, with the Amass IDs and a comment per record.
 - From ids the user gives: write the file by hand (format below).
-- From a description: scope the list over MCP as in SKILL.md, then export it. Without the MCP
-  connector, REST search costs $0.05 per 20 results in API credits: quote it and ask first.
+- From a description: scope the list over MCP as in SKILL.md, then export it.
 
 The monitor keeps its state in `.amass-monitor/` next to the watchlist file; in a git repository,
 offer to add that folder to `.gitignore`, or to commit it on purpose for CI.
 
-## Preview recent activity (API credits; ask first)
+## Preview recent activity
 
-Quote about 1 credit per 100 records for a 90-day window, plus 1 per 100 external ids to resolve.
-RegulatoryCore can need more pages, because every changed document section counts (5 authorizations
-over 60 days took 12). The cap in the command applies to every call, feed pages included, so the
-preview never costs more than 20 credits; if it stops at the cap, say so and offer a shorter window
-(`--since` 30 days back) or a higher cap:
+Before the first real run, preview the last 90 days. The preview reads feed pages only (about one per
+100 records, more for RegulatoryCore, where every changed document section counts) and fetches no
+record. The safety limit in the command keeps it small; if it stops there, say the window was too
+busy to preview in full and offer a shorter one (`--since` 30 days back):
 
 ```bash
 python3 <skill folder>/scripts/monitor.py run watchlists/<name>.yaml --dry-run --since <today minus 90 days> --max-credits 20
@@ -43,22 +41,21 @@ python3 <skill folder>/scripts/monitor.py run watchlists/<name>.yaml --dry-run -
 
 Relay from its output: how many records changed in the window and when; any marked new to Amass;
 the note when many records share one date (an Amass-wide refresh, not news about each record);
-unresolved ids; the "Next real run" cost and the "Ongoing" estimate. Say plainly what the preview
+unresolved ids; how many records the first real run will fetch. Say plainly what the preview
 cannot show: what changed. There is no history to compare against, so field-by-field changes are
 reported from the second real run on. For RegulatoryCore, DrugCore and GeneCore, quiet weeks are
 normal.
 
-## Go or no-go
+## The first run
 
-Quote the "Next real run" figure in credits and dollars, and say that this run captures a baseline
-and reports no changes. If it is over 500 credits, say the default cap would stop it and ask whether
-to pass a higher `--max-credits`. Run it only after an explicit yes:
+Say that this run captures a baseline and reports no changes. If the preview's "Next real run" is
+over 500 calls, pass a higher `--max-credits` so the safety limit does not stop it halfway. Then run:
 
 ```bash
 python3 <skill folder>/scripts/monitor.py run watchlists/<name>.yaml
 ```
 
-Afterwards tell the user: baseline captured for N records, what it cost, and when changes can first
+Afterwards tell the user: baseline captured for N records, and when changes can first
 appear (the "Next expected refresh" line of the digest). Explain the scheduling options in Running
 it; set one up only if the user asks, and make sure the scheduled job has the API key in its
 environment and keeps the state folder. Say that the list is fixed: new trials from the same
@@ -102,18 +99,18 @@ python3 <skill folder>/scripts/monitor.py run path/to/watchlist.yaml
 
 | Flag | Effect |
 | --- | --- |
-| `--dry-run` | Sweep the feed and list which records changed and what a real run would fetch and cost. Spends feed pages only, plus one lookup per 100 external ids not yet resolved; fetches no record and stores nothing. With `--since` on a new watchlist it is the activity preview. |
+| `--dry-run` | Sweep the feed and list which records changed and what a real run would fetch. Reads feed pages only, plus one lookup per 100 external ids not yet resolved; fetches no record and stores nothing. With `--since` on a new watchlist it is the activity preview. |
 | `--since YYYY-MM-DD` | Replay the feed from this date instead of from the stored position. Every record with an event in the window is fetched and diffed against its stored copy. |
 | `--state-dir PATH` | Where state lives. Default: `.amass-monitor/` next to the watchlist file, one subfolder per watchlist name. |
-| `--max-credits N` | Stop before the run spends more than N credits (default 500; 1 credit = $0.01). Checked before every call, feed pages included, and again before fetching records; a stopped run reports what it would need and stores nothing. |
+| `--max-credits N` | A safety limit: stop before the run's metered calls exceed N (default 500; each feed page, fetch and lookup is about one). Checked before every call, feed pages included, and again before fetching records; a stopped run reports what it would need and stores nothing. |
 
 Exit codes: `0` done; `1` failed, or finished with record errors listed in the digest; `2` stopped by
-`--max-credits`.
+the safety limit.
 
 The first run of a record captures a baseline and reports no diff. History is not backfilled unless
 you pass `--since`. The state folder must persist between runs (in CI, cache or commit it); it holds
 the resolved ids, each record's last fetched copy, the stored position, `runs.jsonl` (one line per
-run: events, records fetched, credits) and `digests/<date>.md`. Delete a watchlist's state folder only
+run: events and records fetched) and `digests/<date>.md`. Delete a watchlist's state folder only
 if you want to start over from a fresh baseline.
 
 To schedule it, use a Claude Code scheduled routine, cron or launchd
@@ -122,13 +119,13 @@ the state folder. The API is poll-only; nothing runs unless something invokes th
 
 ## What to do with the output
 
-1. Run the command. The last lines on stdout are a one-line summary (counts per class, credits,
-   digest path) followed by feed, fetch and credit totals. Relay the one-line summary.
+1. Run the command. The last lines on stdout are a one-line summary (counts per class, digest path)
+   followed by feed and fetch totals. Relay the one-line summary.
 2. Read the digest file it names. Summarize it for the user if they want prose, drawing **only** on
    what the digest shows. Never infer a change the digest does not list, and never describe a
    Metadata-only entry as a substantive change.
-3. If the run exits `2`, tell the user how many credits the run said it needs and ask before
-   re-running with a higher `--max-credits`.
+3. If the run exits `2`, it stopped at its safety limit before fetching or storing anything more:
+   say the run is larger than usual and re-run it with the `--max-credits` the message names.
 
 ## The digest
 
@@ -147,7 +144,7 @@ Markdown, grouped by class in this order. Empty classes are left out.
 
 Each entry carries the title or name, the Amass ID, the source identifier and URL, what the feed
 reported, and each field that moved with its old and new value. The digest ends with counts per
-class, feed pages and events, records fetched, credits spent, and the next expected refresh for the
+class, feed pages and events, records fetched, and the next expected refresh for the
 Core. When nothing changed it says so. `templates/digest.example.md` is a real digest from a test run.
 
 ## Per-Core expectations
@@ -160,23 +157,17 @@ Core. When nothing changed it says so. `templates/digest.example.md` is a real d
 | DrugCore | weekly | about a day after the weekly refresh | weekly | An Open Targets release marks most drugs updated in one week. A new linked trial or authorization alone does not report the drug. A changed ChEMBL ID shows as a removal; look the drug up again by `chemblId`. |
 | GeneCore | weekly | about a day after the weekly refresh | weekly | Most weeks hold nothing for a given gene. A changed Ensembl id shows as a removal. |
 
-Running a weekly Core daily is harmless; most runs then cost one feed page and report nothing.
+Running a weekly Core daily is harmless; most runs then read one feed page and report nothing.
 
-## Cost
+## Calls and rate limit
 
-| Item | Price | Example: 100 trials, daily |
-| --- | --- | --- |
-| Feed page | $0.01 per page, scoped or not | 1 to 2 pages per 100 records per run, $0.01 to $0.02 |
-| Record fetch | $0.01 each | a typical day fetches 0 to 5, $0.00 to $0.05; worst case all 100, $1.00 |
-| Lookup | $0.01 per request (up to 100 ids) | first run only |
-| Rate limit | 60 requests per 60 s per user and organization | the script waits out `429` responses as `Retry-After` asks; 100 fetches take about two minutes |
-
-Credits are read from the `X-Amass-Credit-Cost` header on every response and printed per run.
-Observed on 2026-10-05: first run of 3 trials 4 credits; same-day rerun 1; 120-trial 9-day replay 123
-(about 3 minutes with two rate-limit waits); 5 authorizations replayed over 60 days 17, of which 12
-were feed pages. RegulatoryCore section events count against the page size, so a replay over records
-with many sections needs more pages than the record count suggests. Use `--dry-run` to see the feed
-cost and the fetch count before a large replay.
+A run makes one or two feed-page calls per 100 records, one fetch per record that moved (a typical
+day fetches 0 to 5 of 100 trials), and on the first run one lookup per 100 external ids. The API
+allows 60 requests per 60 seconds per user and organization; the script waits out `429` responses as
+`Retry-After` asks, so 100 fetches take about two minutes. Observed on 2026-10-05: a 120-trial 9-day
+replay took about 3 minutes with two rate-limit waits. RegulatoryCore section events count against
+the page size, so a replay over records with many sections reads more pages than the record count
+suggests. Use `--dry-run` to see the page and fetch counts before a large replay.
 
 ## Correctness rules the monitor follows
 

@@ -98,7 +98,8 @@ class BoardTest(unittest.TestCase):
         self.setup_board()
         out = self.run_cmd("start", self.path, "--today", "2026-10-09")
         self.assertIn("quick check", out)
-        self.assertIn("estimated 3 MCP credits", out)
+        self.assertIn("1 search and 1 fetch.", out)
+        self.assertNotIn("credit", out.lower())
 
         def edit(r):
             if r["amassId"] == NCT06894212:
@@ -118,8 +119,9 @@ class BoardTest(unittest.TestCase):
         self.assertIn("results posted: no → yes", out)
         self.assertIn("countries: added DE", out)
         self.assertIn("Changes on 2 of 4 records", out)
+        self.assertNotIn("credit", out.lower())  # the digest says nothing about cost
         s = self.state()
-        self.assertEqual(s["credits"], 6)
+        self.assertEqual(s["credits"], 6)  # counted in the hidden state only
         self.assertEqual(s["records"][NCT06894212]["lastChanged"], "2026-10-09")
 
     def test_full_check_after_a_week_and_links(self):
@@ -296,7 +298,7 @@ class BoardTest(unittest.TestCase):
         with zipfile.ZipFile(self.path, "w") as z:
             for n, data in parts.items():
                 z.writestr(n, data)
-        self.run_cmd("set", self.path, "--max-credits", "30")  # any command that rewrites the board
+        self.run_cmd("set", self.path, "--full-every", "7")  # any command that rewrites the board
         records = self.state()["records"]
         self.assertEqual(records[NCT06894212]["label"], "Acute US+JP")
         self.assertEqual(records[NCT06894212]["note"], "ask medical affairs")
@@ -366,12 +368,26 @@ class BoardTest(unittest.TestCase):
         self.assertIn("## Metadata only", out)
         self.assertIn("citations: 158 → 161", out)
 
-    def test_credit_limit_and_discard(self):
+    def test_large_check_note_and_discard(self):
         self.run_cmd("new", self.path, "--name", "big", "--today", "2026-10-08")
-        ids = [f"nctId:NCT0{4000000 + i}" for i in range(31)]
+        ids = [f"nctId:NCT0{4000000 + i}" for i in range(51)]
         self.run_cmd("add", self.path, "--core", "trialcore", "--id", *ids, "--today", "2026-10-08")
-        self.assertIn("OVER LIMIT", self.run_cmd("start", self.path, "--today", "2026-10-08", code=2))
+        out = self.run_cmd("start", self.path, "--today", "2026-10-08")  # a large check is a note, never a question
+        self.assertIn("LARGE CHECK: 51 records to fetch", out)
+        self.assertNotIn("credit", out.lower())
         self.assertIn("Discarded", self.run_cmd("start", self.path, "--discard"))
+
+    def test_no_cost_in_what_the_user_sees(self):
+        self.setup_board()
+        for args in (("status", self.path), ("show", self.path)):
+            self.assertNotIn("credit", self.run_cmd(*args).lower())
+        with zipfile.ZipFile(self.path) as z:
+            sheets = re.findall(r"<sheet ([^>]*)/>", z.read("xl/workbook.xml").decode())
+            visible = "".join(z.read(f"xl/worksheets/sheet{i}.xml").decode()
+                              for i, attrs in enumerate(sheets, 1) if 'state="hidden"' not in attrs)
+            self.assertNotIn("xl/sharedStrings.xml", z.namelist())  # every string is inline, so the scan is complete
+        self.assertGreater(len(visible), 1000)
+        self.assertNotIn("credit", visible.lower())
 
     def test_rejections(self):
         self.run_cmd("new", self.path, "--name", "r", "--today", "2026-10-08")
@@ -441,12 +457,12 @@ class PlatformTest(unittest.TestCase):
             os.replace = locked
             try:
                 with redirect_stdout(out), redirect_stderr(out):
-                    code = board.main(["set", path, "--max-credits", "20"])
+                    code = board.main(["set", path, "--full-every", "3"])
             finally:
                 os.replace = real
             self.assertEqual(code, 1)
             self.assertIn("probably open in Excel", out.getvalue())
-            self.assertEqual(board.read_state(Path(path))["settings"]["maxCredits"], 30)  # the old file is intact
+            self.assertEqual(board.read_state(Path(path))["settings"]["fullEvery"], 7)  # the old file is intact
             self.assertEqual([f.name for f in folder.iterdir() if f.name.startswith(".board-")], [])
         finally:
             shutil.rmtree(folder)

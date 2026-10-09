@@ -6,7 +6,7 @@ ids:
   # Amass IDs are used as they are.
   - AMTC_UOVYXZ2dY42Kn663vgBL0221KY4   # NCT07759128, Phase 3, recruiting
   - AMTC_KGCxl0fhol8AzsKSl4lwafcHyxW   # NCT07066254, withdrawn
-  # External ids are looked up once on the first run ($0.01 per 100 ids) and remembered.
+  # External ids are looked up once on the first run and remembered.
   - nctId: NCT04907084                 # results first posted 2026-09-21
 # Optional: fields to fetch and watch on top of the Core's defaults
 # (TrialCore always fetches outcomes and referencesBiomedCore).

@@ -43,7 +43,7 @@ CHUNK = 30000  # characters per state cell; Excel caps a cell at 32,767
 SEARCH_CREDITS = 2
 FETCH_CREDITS = 1
 DEFAULT_FULL_EVERY = 7
-DEFAULT_MAX_CREDITS = 30
+LARGE_CHECK = 50  # fetches in one check above which Claude says it will take a while and offers API mode
 LIST_CAP = 10
 LABEL_MAX = 40
 
@@ -859,15 +859,14 @@ ABOUT_LINES = (
     ("Your edits", "Each check rewrites this file. What you type in the Short name and Notes columns of the record "
      "sheets is kept; everything else is regenerated."),
     ("How a check works", "Claude re-reads each record through the Amass MCP connector, and the file's helper "
-     "compares it field by field with the copy stored here. Daily checks re-run the stored searches (2 credits "
-     "each) and fetch only what they miss; a weekly full check fetches every record (1 credit each) and also "
-     "catches new cross-links."),
+     "compares it field by field with the copy stored here. Daily checks re-run the stored searches and fetch "
+     "only what they miss; a weekly full check fetches every record and also catches new cross-links."),
     ("What it cannot see", "Results revised after their first posting, why a trial stopped, which label or SmPC "
      "section changed, errata and expressions of concern, and the exact day of a change. Amass API mode sees "
      "all of these."),
     ("Worth watching", "Prompts computed from the records' own dates and registries (a trial about to end, a "
      "missed start date, results posted only in a registry copy, results not posted a year after completion). "
-     "They cost nothing and are not news from Amass."),
+     "They come from what this file already holds and are not news from Amass."),
 )
 
 
@@ -1125,7 +1124,7 @@ class Board:
             "created": iso(today),
             "settings": {
                 "intervals": {c.key: c.interval for c in CORES.values()},
-                "fullEvery": DEFAULT_FULL_EVERY, "maxCredits": DEFAULT_MAX_CREDITS,
+                "fullEvery": DEFAULT_FULL_EVERY,
             },
             "cores": {}, "searches": [], "records": {}, "pendingIds": [], "changes": [], "checks": [],
             "credits": 0,
@@ -1544,11 +1543,11 @@ class Board:
         return {"name": "Changes", "rows": rows, "widths": [11, 14, 24, 50, 26, 70, 36]}
 
     def checks_sheet(self) -> dict:
-        rows = [["Date", "Kind", "Checked", "Not due", "Records checked", "Changes", "Credits", "Note"]]
+        rows = [["Date", "Kind", "Checked", "Not due", "Records checked", "Changes", "Note"]]
         for c in reversed(self.state["checks"]):
             rows.append([c["date"], c["kind"], c.get("checked"), c.get("notDue"), c.get("records"),
-                         c.get("changes"), c.get("credits"), c.get("note")])
-        return {"name": "Checks", "rows": rows, "widths": [11, 10, 40, 40, 10, 9, 8, 50]}
+                         c.get("changes"), c.get("note")])
+        return {"name": "Checks", "rows": rows, "widths": [11, 10, 40, 40, 10, 9, 50]}
 
     def settings_sheet(self) -> dict:
         s = self.state
@@ -1557,7 +1556,6 @@ class Board:
             ["Name", s["name"]],
             ["Created", s["created"]],
             ["Full check every", f"{s['settings']['fullEvery']} days"],
-            ["Credit limit per check", f"{s['settings']['maxCredits']} MCP credits before Claude asks"],
         ]
         for core in self.cores_present():
             info = s["cores"].get(core.key, {})
@@ -1571,8 +1569,6 @@ class Board:
             covers = sum(1 for rec in self.records.values() if search["id"] in rec.get("seenBy", []))
             rows.append([f"Search {search['id']}", f"{CORES[search['core']].label}: {search_label(search)} "
                                                    f"(covers {plural(covers, 'record')})"])
-        rows.append(["Credits so far", f"{s['credits']} MCP credits (nominal: 2 per search, 1 per fetch; "
-                     "your plan balance shows the exact charge)"])
         return {"name": "Settings", "rows": rows, "widths": [24, 110]}
 
 
@@ -1836,7 +1832,7 @@ def digest(board: Board, check: dict, result: dict, final: bool) -> str:
         one += f"; {len(meta_ids)} with metadata-only changes"
     if result["baseline"]:
         one += f"; baseline captured for {len(result['baseline'])}"
-    lines += [f"**One line:** {one[0].upper() + one[1:]}. {plural(check['credits'], 'MCP credit')}.", ""]
+    lines += [f"**One line:** {one[0].upper() + one[1:]}.", ""]
     if not final:
         lines.insert(0, "(Review: nothing is stored until `finish`.)\n")
     for cls in CLASS_ORDER:
@@ -1913,8 +1909,6 @@ def digest(board: Board, check: dict, result: dict, final: bool) -> str:
             full_text = ("now" if full_due == "now" else human_date(full_due)) if full_due else None
             lines.append(f"Next {core.label} check due {due_text}" + (f" (full check {full_text})" if full_text else "")
                          + ".")
-    lines.append(f"Credits: {plural(check['credits'], 'MCP credit')} (nominal: 2 per search, 1 per fetch; your plan "
-                 "balance shows the exact charge).")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -2097,8 +2091,7 @@ def _add_ids(board: Board, core: Core, ids: list, today: str, note: str) -> int:
             added += 1
     _log_setup(board, today, 0)
     board.save()
-    print(f"{added} added by id, {known} already on the board. They are fetched in the next check "
-          f"(1 credit each); run `start`.")
+    print(f"{added} added by id, {known} already on the board. They are fetched in the next check; run `start`.")
     return 0
 
 
@@ -2149,13 +2142,10 @@ def cmd_set(args: argparse.Namespace) -> int:
         settings["intervals"][core.key] = int(days)
     if args.full_every is not None:
         settings["fullEvery"] = max(1, args.full_every)
-    if args.max_credits is not None:
-        settings["maxCredits"] = max(1, args.max_credits)
     if args.title:
         board.state["title"] = args.title
     board.save()
-    print(f"Settings: intervals {settings['intervals']}, full check every {settings['fullEvery']} days, "
-          f"{settings['maxCredits']} credits per check before asking.")
+    print(f"Settings: intervals {settings['intervals']}, full check every {settings['fullEvery']} days.")
     return 0
 
 
@@ -2224,18 +2214,19 @@ def cmd_start(args: argparse.Namespace) -> int:
         else:
             plan[core.key] = {"mode": "quick", "searches": searches, "fetch": fetch_quick, "expect": rids + pend}
     if not plan:
-        print("Nothing is due; no credits needed.")
+        print("Nothing is due.")
         for note in not_due:
             print(f"- {note}")
-        print(f"This board has used {plural(board.state['credits'], 'MCP credit')} so far.")
         return 0
     estimate = sum(SEARCH_CREDITS * len(p["searches"]) + FETCH_CREDITS * len(p["fetch"]) for p in plan.values())
     check = {"board": str(board.path), "date": iso(today), "plan": plan, "notDue": not_due, "obs": {},
              "notFound": [], "searchesRun": [], "credits": 0, "resolved": {}, "estimate": estimate}
     board.save_check(check)
     b = shlex.quote(str(board.path))
-    out.append(f"Check of {iso(today)} for {board.state['title']}: estimated {plural(estimate, 'MCP credit')} "
-               "(2 per search, 1 per fetch).")
+    n_search = sum(len(p["searches"]) for p in plan.values())
+    n_fetch = sum(len(p["fetch"]) for p in plan.values())
+    out.append(f"Check of {iso(today)} for {board.state['title']}: {n_search} search{'' if n_search == 1 else 'es'} "
+               f"and {n_fetch} fetch{'' if n_fetch == 1 else 'es'}.")
     for core_key, p in plan.items():
         core = CORES[core_key]
         last = board.core_state(core).get("lastChecked")
@@ -2275,10 +2266,9 @@ def cmd_start(args: argparse.Namespace) -> int:
     out.append("")
     out.append(f"When every record is in: {helper()} review {b}, verify, then finish.")
     print("\n".join(out))
-    if estimate > int(settings["maxCredits"]):
-        print(f"\nOVER LIMIT: {estimate} credits is above this board's {settings['maxCredits']} per check. "
-              "Ask the user before making any call. If they decline: `start --discard`.")
-        return 2
+    if n_fetch > LARGE_CHECK:
+        print(f"\nLARGE CHECK: {n_fetch} records to fetch one by one, which takes a while. Say so before starting; "
+              "for a list this size, API mode (references/api-mode.md) reads the change feed instead.")
     return 0
 
 
@@ -2360,7 +2350,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         parts.append(f"{len(ignored)} ignored (not on the board)")
     if args.not_found:
         parts.append(f"{len(args.not_found)} marked not found")
-    print(f"{core.label}: " + ", ".join(parts) + f". Credits so far: {check['credits']}.")
+    print(f"{core.label}: " + ", ".join(parts) + ".")
     if dropped_notes:
         print("Text over 300 characters is not tracked: " + "; ".join(dropped_notes))
     print(_remaining(board, check, core))
@@ -2394,12 +2384,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     board = Board.load(Path(args.board))
     check = board.load_check()
     if check:
-        print(f"Open check of {check['date']} ({check['credits']} credits so far, {check['estimate']} estimated).")
+        print(f"Open check of {check['date']}.")
         for core_key in check["plan"]:
             print(_remaining(board, check, CORES[core_key]))
         return 0
     s = board.state
-    print(f"{s['title']} ({board.path}), created {s['created']}, {s['credits']} MCP credits so far.")
+    print(f"{s['title']} ({board.path}), created {s['created']}.")
     today = today_of(args)
     for core in board.cores_present():
         info = s["cores"].get(core.key, {})
@@ -2740,7 +2730,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--only", nargs="+", metavar="ID",
                    help="keep only these records (Amass IDs or source ids such as NCT ids); for a saved result that "
                         "holds more than the board should")
-    p.add_argument("--correction", action="store_true", help="re-sending records already paid for: no credits counted")
+    p.add_argument("--correction", action="store_true", help="re-sending records after a copy slip: not counted as a new call")
     p.set_defaults(func=cmd_add)
 
     p = sub.add_parser("remove", parents=[common], help="take records or stored searches off the board")
@@ -2748,10 +2738,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--search-id", nargs="+", metavar="SID")
     p.set_defaults(func=cmd_remove)
 
-    p = sub.add_parser("set", parents=[common], help="change intervals, the full-check cadence or the credit limit")
+    p = sub.add_parser("set", parents=[common], help="change intervals, the full-check cadence or the title")
     p.add_argument("--interval", action="append", metavar="CORE=DAYS")
     p.add_argument("--full-every", type=int, metavar="DAYS")
-    p.add_argument("--max-credits", type=int, metavar="N")
     p.add_argument("--title")
     p.set_defaults(func=cmd_set)
 
@@ -2769,7 +2758,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--not-found", nargs="+", metavar="ID", help="ids the fetch tool could not find")
     p.add_argument("--for", dest="for_id", metavar="TYPE:VALUE", help="the unresolved id a single fetched record answers")
     p.add_argument("--raw", metavar="FILE", help="read the records from a saved tool result instead of stdin")
-    p.add_argument("--correction", action="store_true", help="fixing a copy slip: no credits counted")
+    p.add_argument("--correction", action="store_true", help="fixing a copy slip: not counted as a new call")
     p.set_defaults(func=cmd_ingest)
 
     p = sub.add_parser("status", parents=[common], help="the open check's progress, or the board's schedule")

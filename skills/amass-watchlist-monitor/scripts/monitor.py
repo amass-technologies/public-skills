@@ -10,7 +10,7 @@ each one is diffed field by field against the snapshot stored last time.
 
 Standard library only, Python 3.11+. Reads the API key from AMASS_API_KEY.
 Exit codes: 0 done, 1 failed (or finished with record errors), 2 stopped by
---max-credits before spending more.
+the run's safety limit (--max-credits) before making more calls.
 """
 
 from __future__ import annotations
@@ -541,7 +541,7 @@ class Client:
     def ensure_budget(self, needed: float, what: str) -> None:
         if self.spent + needed > self.max_credits:
             raise BudgetExceeded(
-                f"{what} needs about {needed:g} more credit(s); {self.spent:g} already spent this run and "
+                f"{what} needs about {needed:g} more metered call(s); {self.spent:g} already made this run and "
                 f"--max-credits is {self.max_credits:g}. Nothing more was fetched or stored. Re-run with "
                 f"--max-credits {math.ceil(self.spent + needed)} or higher to allow it."
             )
@@ -737,8 +737,6 @@ def _pid_alive_windows(pid: int) -> bool:
         kernel32.CloseHandle(handle)
 
 
-def _credits(n: float) -> str:
-    return f"{n:g} credit{'' if n == 1 else 's'} (${n / 100:.2f})"
 
 
 def _now_iso() -> str:
@@ -1177,7 +1175,7 @@ class Run:
             # so the first real run looks them up again.
             self.notes.append(
                 f"Looked up {len(pending)} external id(s) for this dry run ({math.ceil(len(pending) / LOOKUP_BATCH)} "
-                "credit(s)); not stored, so the first real run looks them up again."
+                "request(s)); not stored, so the first real run looks them up again."
             )
         if pending:
             for start in range(0, len(pending), LOOKUP_BATCH):
@@ -1417,11 +1415,6 @@ class Run:
         return 0 if not self.errors else 1
 
     # -- output --------------------------------------------------------------
-    def credit_line(self) -> str:
-        c = self.client.credits
-        total = self.client.spent
-        return f"{_credits(total)}: feed pages {c['feed']:g}, record GETs {c['get']:g}, lookups {c['lookup']:g}"
-
     def counts(self, reports: dict[str, Report]) -> dict[str, int]:
         return {cls: sum(1 for r in reports.values() if cls in r.lines) for cls in CLASS_ORDER}
 
@@ -1497,7 +1490,6 @@ class Run:
             f"{len(applied)} already reflected in the stored snapshots",
             f"- Fetched: {len(fresh)} record(s) ({len(baseline)} baseline, {len(changed)} with feed events); "
             f"{len(removed)} removal(s) need no fetch",
-            f"- Credits spent: {self.credit_line()}",
         ]
         if self.client.rate_limit_retries:
             out.append(
@@ -1541,12 +1533,11 @@ class Run:
             headline += f"; {counts[BASELINE]} baseline captured"
         print(
             f"amass-watchlist-monitor: {self.wl['name']} ({self.core.label}): {headline}. "
-            f"{_credits(self.client.spent)}. Digest: {digest_path}"
+            f"Digest: {digest_path}"
         )
         print(f"  feed: {sum(c['pages'] for c in chunk_runs)} page(s), {sum(c['arrivals'] for c in chunk_runs)} event(s) "
               f"on {len(events)} record(s), {len(applied)} already applied")
         print(f"  fetched: {self.client.calls['get']} ({len(baseline)} baseline, {len(changed)} changed); removed: {len(removed)}")
-        print(f"  credits: {self.credit_line()}")
         if self.client.rate_limit_retries:
             print(f"  rate limited: {self.client.rate_limit_retries} retry(ies), {self.client.backoff_seconds:.0f}s waited")
         for u in self.unresolved:
@@ -1555,7 +1546,7 @@ class Run:
             print(f"  error: {e}")
 
     def finish_dry_run(self, chunk_runs, events, baseline, changed, removed, applied) -> int:
-        """Report feed activity and what a real run would cost, without fetching anything.
+        """Report feed activity and what a real run would fetch, without fetching anything.
 
         On a new watchlist this is the preview: which records changed in the window
         and when. It cannot say what changed; there is no stored copy to compare yet.
@@ -1602,7 +1593,7 @@ class Run:
         lookups = self.client.calls["lookup"]
         next_run = fetch + len(chunk_runs) + lookups
         print(f"Next real run: fetches {fetch} record(s) ({len(baseline)} baseline, {len(changed)} changed), "
-              f"about {_credits(next_run)} with the feed pages" + (" and the lookup." if lookups else "."))
+              f"about {next_run} call(s) with the feed pages" + (" and the lookup." if lookups else "."))
         if baseline:
             print("  A record with no stored copy is captured as a baseline: that run reports no change for it; "
                   "changes show from the following run.")
@@ -1613,10 +1604,9 @@ class Run:
             records = len(events) * every / days
             print(
                 f"Ongoing, at the recommended {'daily' if every == 1 else 'weekly'} cadence and the activity seen here: "
-                f"about {_credits(round(pages + records, 1))} a run ({pages:.2g} feed page(s) + {records:.2g} changed "
-                "record(s)). A floor: the feed shows each record's latest change only."
+                f"about {pages:.2g} feed page(s) and {records:.2g} changed record(s) a run. A floor: the feed shows each "
+                "record's latest change only."
             )
-        print(f"Credits spent: {self.credit_line()}")
         self.log_run("dry-run", chunk_runs, events, baseline, changed, removed, applied, None)
         return 0
 
@@ -1635,7 +1625,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--since", metavar="YYYY-MM-DD", help="replay the feed from this date instead of the stored since")
     run.add_argument("--state-dir", metavar="PATH", help="state root (default: .amass-monitor next to the watchlist)")
     run.add_argument("--max-credits", type=float, default=DEFAULT_MAX_CREDITS, metavar="N",
-                     help=f"stop before a run spends more than N credits (default {DEFAULT_MAX_CREDITS}; 1 credit = $0.01)")
+                     help=f"safety limit: stop before the run's metered calls exceed N (default {DEFAULT_MAX_CREDITS})")
     args = parser.parse_args(argv)
 
     try:
@@ -1652,14 +1642,11 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 return runner.execute()
             except BudgetExceeded as err:
-                print(f"STOPPED by --max-credits: {err}")
-                print(f"  credits spent: {runner.credit_line()}")
+                print(f"STOPPED by the run's safety limit (--max-credits): {err}")
                 runner.log_run("stopped-budget", runner.chunk_runs, {}, [], [], [], [], None, error=str(err))
                 return 2
             except MonitorError as err:
                 runner.log_run("error", runner.chunk_runs, {}, [], [], [], [], None, error=str(err))
-                if client.spent:
-                    print(f"credits spent before the failure: {runner.credit_line()}", file=sys.stderr)
                 raise
     except MonitorError as err:
         print(f"error: {err}", file=sys.stderr)

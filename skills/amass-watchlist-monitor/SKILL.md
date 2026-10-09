@@ -24,7 +24,6 @@ There are two modes. Default to MCP mode.
 | Needs | the Amass connector and code execution | `AMASS_API_KEY` and a shell that reaches `api.amass.tech` |
 | Runs in | Claude chat, Cowork, Claude Code | Claude Code, scheduled jobs, CI |
 | Sees | current state of each record at each check | also revised results, why a trial stopped, which label sections changed, removals, the date of each change |
-| Costs | MCP credits: a few per daily check, 1 per record for a weekly full check | API credits: about 1 cent per 100 records a day |
 
 Offer API mode only when the user needs what only it sees, watches hundreds of records, or wants
 the watch scheduled or built into their own tool; then follow `references/api-mode.md`.
@@ -55,14 +54,10 @@ In Claude chat, files the user attaches are usually under `/mnt/user-data/upload
 written to `/mnt/user-data/outputs/` are offered to the user for download; if those folders do not
 exist, keep the board in the working directory and hand it over the way the client allows.
 
-**Credits.** Every MCP search costs 2 credits whatever its `limit` and every fetch 1; the helper
-counts these nominal credits, and the plan balance shows the exact charge. Setting
-up a list usually costs 4 to 10. A daily check costs 2 per stored search plus 1 per record the
-searches miss; a weekly full check costs 1 per record. Say the expected cost in a short clause
-before spending ("this check is about 4 MCP credits"); ask first only when `start` says a check is
-over the board's limit (30 by default).
-
 ## How a conversation starts
+
+The aim is the fewest possible questions, and nothing about usage or cost. Amass meters the MCP
+itself; when it says no, the section "When Amass says no" applies.
 
 - **A board is attached or named, or the user asks to check:** go to Check for changes.
 - **No board:** go to Set up a watchlist.
@@ -73,7 +68,7 @@ over the board's limit (30 by default).
 ## Set up a watchlist
 
 1. **Open** in two sentences: what the watch does, and that you will build the list together with a
-   few searches (2 MCP credits each) and hand over one Excel file to keep.
+   few searches and hand over one Excel file to keep.
 2. **Interview, only what is missing.** If the request already says what to watch, restate it in
    one line and go on. Otherwise ask, in one message, at most three things with an example answer
    each: what to watch (trials, papers, FDA or EMA authorizations, drugs, genes); which records (ids
@@ -100,11 +95,11 @@ over the board's limit (30 by default).
 
    - `--search` takes the exact query, with one `--filter key=value` per filter and the `--limit`
      you ran it with: the search is stored and quick checks re-run it exactly. Run searches you may
-     keep at `limit` 50: a search costs 2 credits whatever its limit, and room below the board's
-     records keeps a newly listed trial from pushing one of them out (when that happens, the check
-     fetches the missing record for 1 credit).
+     keep at `limit` 50: one call returns up to 50 records whatever the limit, and room below the
+     board's records keeps a newly listed trial from pushing one of them out (when that happens, the
+     check fetches the missing record).
    - Records you fetched go in with `--fetch`. Ids the user gave that you did not fetch go in with
-     `--id nctId:NCT04072354` (or an Amass ID); they are fetched in the first check, 1 credit each.
+     `--id nctId:NCT04072354` (or an Amass ID); they are fetched in the first check.
      More than 10 ids given: add them with `--id` rather than fetching them one by one now.
    - Search returns the best matches by relevance, not a complete list. Use the tool's filters
      (phase, status, `hasResults`, agency, stage) and `limit` up to 50. A trial id or a sponsor drug
@@ -117,7 +112,7 @@ over the board's limit (30 by default).
      are worth watching; old EUCTR copies of trials that ended long ago often keep a stale status,
      so suggest skipping them. EUCTR holds one record per country (`EUCTR2019-000696-16-HR`) and
      search returns just one of them: watch one country record per trial, or the CTIS record when
-     the trial has one. A record that no stored search returns is fetched at every check (1 credit).
+     the trial has one. A record that no stored search returns is fetched at every check.
 
    | Core | Search tool | Fetch tool: `type` values |
    | --- | --- | --- |
@@ -169,7 +164,7 @@ over the board's limit (30 by default).
    - anything under **Worth watching** in `board.py show <board>`, as it stands today;
    - that the **Overview** sheet opens first: what changed, worth watching, and a timeline; and that
      the Short name and Notes columns of the record sheets are theirs to edit and are kept;
-   - when the next check is due, and what setup cost (`board.py status <board>` gives both);
+   - when the next check is due (`board.py status <board>`);
    - how to come back: "attach this file to a new conversation and say *check my watchlist*" (in
      Cowork or Claude Code: "ask me to check the watchlist");
    - that changes show from the next check on, and that the list is fixed: new records do not join
@@ -183,8 +178,9 @@ over the board's limit (30 by default).
 2. **Plan.** `python3 <skill folder>/scripts/board.py start <board>` prints, per Core, whether it is
    due and the exact MCP calls to make. A Core checked within its refresh interval is skipped:
    Amass has nothing new for it yet. If nothing is due, tell the user when the next check is due and
-   stop, unless they want one anyway (`start --force`). Exit code 2 means the check is over the
-   board's credit limit: ask, then either go on or run `start --discard`.
+   stop, unless they want one anyway (`start --force`). A `LARGE CHECK` note means many records to
+   fetch one by one: say in a sentence that it will take a while, go on, and for a list that size
+   offer API mode.
 3. **Make the calls in the order given.** After each search, ingest every watched record in its
    result (the `start` output lists the watched ids). After every few fetches, ingest them:
 
@@ -206,12 +202,12 @@ over the board's limit (30 by default).
 5. **Review before storing.** `board.py review <board>` prints the changes found. For each one, find
    the record in this conversation's tool result and confirm the new value is what the tool
    returned. If you copied a value wrong, ingest that record again with the exact values and
-   `--correction` (no credits are counted), then review again.
+   `--correction`, then review again.
 6. **Finish.** `board.py finish <board>` stores the check, rewrites the board and prints the digest.
    Relay, in this order: the One line; the changes by group; the **Worth watching** items, presented
    as prompts derived from the records' dates and registries rather than news; the **Where it
    stands** table (paste it, or say it in a sentence for a board with one indication); the Cores
-   not due and when they are; the credits. Draw only on the digest; never add a change it does not list, and
+   not due and when they are. Draw only on the digest; never add a change it does not list, and
    never present a metadata-only entry (a citation count, an Amass update date) as news. If
    `finish` ends with a hint about registry records not linked to a trial, or trials have no short
    name (boards made before these existed), offer once to fix that with `annotate`.
@@ -221,6 +217,15 @@ over the board's limit (30 by default).
 
 If the conversation is compacted or interrupted mid-check, run `board.py status <board>`: it names
 the searches still to run and the records still to fetch. Never redo a search that was ingested.
+
+## When Amass says no
+
+The MCP meters usage itself. A tool result that says the plan's MCP usage is exhausted means: stop
+calling, keep what is already on the board, and tell the user plainly that the Amass plan's MCP
+usage is exhausted, relaying the service's own message, which says whether to wait or to upgrade.
+Nothing is lost: an open check is stored in the board, so hand the file back and resume later from
+`board.py status <board>`. A rate-limit response is retried after a pause; a timeout is retried
+once; neither is mentioned to the user.
 
 ## Copying records into the helper
 
@@ -260,9 +265,9 @@ that, since Amass has nothing newer for it yet. To check a Core less often, chan
 
 **Quick and full checks.** For TrialCore and BiomedCore, search results carry every tracked field
 except the cross-links. So within a week of a full check, a due check re-runs the stored searches
-that cover the board (2 credits each) and fetches only what they miss; every 7 days it fetches every
-record (1 credit each), which also catches new cross-links (`set --full-every` changes the 7). When
-the searches would cost as much as fetching everything, `start` plans a full check. The other Cores
+that cover the board and fetches only what they miss; every 7 days it fetches every record, which
+also catches new cross-links (`set --full-every` changes the 7). When the searches would take
+nearly as many calls as fetching everything, `start` plans a full check. The other Cores
 are always fetched.
 
 ## The digest and the board
@@ -277,11 +282,11 @@ look, nothing to compare yet); Not checked this time (only with `finish --allow-
 names the record by its short name and source id; a registry copy is named after its trial ("Acute,
 US + Japan, jRCT copy (JPRN-jRCT2031250398)"). Then **Worth watching**, **Where it stands** (per
 indication: trials, ongoing, not yet recruiting, completed, stopped, the next expected end, and how
-many have results), what was checked, the Cores not due, when each next check is due, and the
-credits. `review` prints the same changes with the registries' raw values and the Amass IDs, for
+many have results), what was checked, the Cores not due, and when each next check is due.
+`review` prints the same changes with the registries' raw values and the Amass IDs, for
 checking against the tool results.
 
-**Worth watching** is computed from the records alone, at no cost, one line per trial:
+**Worth watching** is computed from the records already on the board, with no call, one line per trial:
 - ends within 60 days (expect a status change), or its completion date has passed while the
   registry still says it is ongoing;
 - its start date has passed while it is still not yet recruiting;
@@ -300,8 +305,8 @@ trials by indication, one bar per trial coloured by status (◆ ends within 60 d
 ✕ stopped early, ⚠ listed under Worth watching), with registry copies under "Also in". Then one sheet
 per kind of record with every tracked field (status and the latest change up front, each copy
 marked ↳ under its trial, rows changed in the latest check highlighted), Changes (every change ever
-found), Checks (each check, what it covered and its credits) and Settings (how the file works, what
-the watch cannot see, stored searches, intervals and the credit limit). The Short name and Notes
+found), Checks (each check and what it covered) and Settings (how the file works, what the watch cannot
+see, stored searches and intervals). The Short name and Notes
 columns of the record sheets belong to the user: what they type there is kept at every rewrite.
 
 ## What MCP mode cannot see
@@ -343,19 +348,19 @@ options. Every command that changes the board rewrites the .xlsx; an open check 
 | `ingest --core C (--search S \| --fetch) [--not-found ID…] [--for type:value] [--raw FILE] [--correction]` | hand over what a call returned |
 | `review` | the changes found, before anything is stored |
 | `finish [--allow-missing] [--digest FILE]` | store, rewrite the board, print the digest |
-| `set [--interval core=days] [--full-every N] [--max-credits N] [--title T]` | settings |
+| `set [--interval core=days] [--full-every N] [--title T]` | settings |
 | `export (csv \| watchlist) --out DIR` | CSV copies of the sheets, or watchlist files for API mode |
 
-Exit codes: `0` done; `1` error, nothing stored (the message says why); `2` `start` found the check
-over the board's credit limit.
+Exit codes: `0` done; `1` error, nothing stored (the message says why); `2` the command line itself
+was wrong.
 
 ## Rules
 
 - The board is the only memory. Never reconstruct a record, a stored value or a past change from
   memory, and never edit the file by hand; the hidden `_state` sheet is the helper's.
 - Never compare values yourself and never report a change the helper did not find.
-- Ingest after every search and every few fetches, before the next call: credits spent on a result
-  that never reaches the board are wasted.
+- Ingest after every search and every few fetches, before the next call: a result that never
+  reaches the board is a call wasted.
 - One open check per board. Finish it or discard it before adding or removing records.
 - The board holds the user's list and nothing secret; still, do not send it anywhere the user did
   not ask for.
