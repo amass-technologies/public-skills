@@ -141,6 +141,25 @@ class BoardTest(unittest.TestCase):
         self.assertIn("not found when fetched", out)
         self.assertEqual(self.state()["cores"]["trialcore"]["lastFull"], "2026-10-15")
 
+    def test_add_only_keeps_the_named_records_from_a_saved_result(self):
+        self.run_cmd("new", self.path, "--name", "t", "--today", "2026-10-08")
+        raw = self.dir / "search.json"
+        raw.write_text(json.dumps({"results": fixture("search_ulotaront.json")}))
+        total = len(fixture("search_ulotaront.json"))
+        self.assertGreater(total, 3)
+        nct = next(r["nctId"] for r in fixture("search_ulotaront.json") if r["amassId"] == NCT06894212)
+        out = self.run_cmd("add", self.path, "--core", "trialcore", "--search", "ulotaront", "--limit", "50",
+                           "--raw", str(raw), "--only", nct, CTIS_MDD, "--today", "2026-10-08")
+        self.assertIn("2 added", out)
+        s = self.state()
+        self.assertEqual(set(s["records"]), {NCT06894212, CTIS_MDD})
+        self.assertEqual(s["credits"], 2)  # one search, whatever --only kept
+        # an id that is not in the result is refused and nothing is stored
+        out = self.run_cmd("add", self.path, "--core", "trialcore", "--search", "ulotaront", "--limit", "50",
+                           "--raw", str(raw), "--only", "NCT00000000", "--today", "2026-10-08", code=1)
+        self.assertIn("NCT00000000", out)
+        self.assertEqual(set(self.state()["records"]), {NCT06894212, CTIS_MDD})
+
     def test_validation_rejects_the_whole_batch(self):
         self.setup_board()
         self.run_cmd("start", self.path, "--today", "2026-10-16")

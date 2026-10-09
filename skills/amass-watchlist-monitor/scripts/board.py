@@ -1964,6 +1964,25 @@ def _log_setup(board: Board, today: str, credits: int, searches: int = 0, fetche
     board.state["credits"] += credits
 
 
+def keep_only(prepared: list, wanted: list) -> list:
+    """The records among `prepared` that `wanted` names, by Amass ID or any source id (a `type:` prefix is
+    allowed). An id that matches nothing is an error, so a typo never leaves a record silently off the board."""
+    keys = {w.split(":", 1)[1].strip().upper() if ":" in w and not w.upper().startswith("AM") else w.strip().upper()
+            for w in wanted if w.strip()}
+    kept, seen = [], set()
+    for item in prepared:
+        aid, _fields, ident, _dropped = item
+        names = {aid.upper()} | {str(v).upper() for v in ident.values() if v}
+        hit = names & keys
+        if hit:
+            kept.append(item)
+            seen |= hit
+    missing = sorted(keys - seen)
+    if missing:
+        raise BoardError(f"--only names ids that are not in these records: {', '.join(missing)}")
+    return kept
+
+
 def cmd_add(args: argparse.Namespace) -> int:
     board = Board.load(Path(args.board))
     if board.load_check():
@@ -1989,6 +2008,9 @@ def cmd_add(args: argparse.Namespace) -> int:
                          "--fetch, --id, or --watchlist FILE")
     items, strict = read_items(core, args, allow_empty=False)
     prepared = prepare_all(core, items, strict)
+    fetched = len(prepared)  # every record a fetch returned was paid for, whatever --only keeps
+    if args.only:
+        prepared = keep_only(prepared, args.only)
     sid = None
     credits = 0
     if args.search:
@@ -2004,7 +2026,7 @@ def cmd_add(args: argparse.Namespace) -> int:
         if not args.correction:
             credits = SEARCH_CREDITS
     elif not args.correction:
-        credits = FETCH_CREDITS * len(prepared)
+        credits = FETCH_CREDITS * fetched
     added, merged, dropped_notes = 0, 0, []
     for aid, fields, ident, dropped in prepared:
         if dropped:
@@ -2036,7 +2058,7 @@ def cmd_add(args: argparse.Namespace) -> int:
     if core.quick and not info.get("lastFull"):
         info["lastFull"] = today
     _log_setup(board, today, credits, searches=1 if sid and credits else 0,
-               fetches=len(prepared) if args.fetch and credits else 0)
+               fetches=fetched if args.fetch and credits else 0)
     board.save()
     total = len(board.records_of(core)) + len(board.pending_of(core))
     print(f"{added} added, {merged} already on the board. {core.label}: {total} records. Board saved to {board.path}.")
@@ -2715,6 +2737,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--id", nargs="+", metavar="ID", help="add by id only, fetched in the next check: AMTC_... or nctId:NCT...")
     p.add_argument("--watchlist", metavar="FILE", help="import the ids of an API-mode watchlist file")
     p.add_argument("--raw", metavar="FILE", help="read the records from a saved tool result instead of stdin")
+    p.add_argument("--only", nargs="+", metavar="ID",
+                   help="keep only these records (Amass IDs or source ids such as NCT ids); for a saved result that "
+                        "holds more than the board should")
     p.add_argument("--correction", action="store_true", help="re-sending records already paid for: no credits counted")
     p.set_defaults(func=cmd_add)
 

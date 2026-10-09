@@ -237,7 +237,9 @@ the searches still to run and the records still to fetch. Never redo a search th
   Leave out RegulatoryCore `documentSections` when typing.
 - When the client saved a large tool result to a file and gave you its path (Claude Code does),
   pass `--raw <path>` instead of typing; the helper extracts the records and counts document
-  sections itself.
+  sections itself. When only some of that result belongs on the board, add `--only` with their
+  ids (`add ... --raw <path> --only NCT06894212 CTIS2022-500538-27-00`); an id that is not in the
+  result is refused, not skipped.
 - The helper rejects the whole batch on an unknown field name, a status or phase value outside the
   tool's vocabulary, a malformed date or an Amass ID of another Core, and says which. Fix and
   resend; nothing was stored.
@@ -332,7 +334,7 @@ options. Every command that changes the board rewrites the .xlsx; an open check 
 | Command | Use |
 | --- | --- |
 | `new --name N --title T` | create an empty board |
-| `add --core C (--search Q [--filter k=v] [--limit N] \| --fetch \| --id ID… \| --watchlist FILE)` | put records on the board; their first look is the baseline; `--watchlist` imports an API-mode file |
+| `add --core C (--search Q [--filter k=v] [--limit N] \| --fetch \| --id ID… \| --watchlist FILE) [--raw FILE [--only ID…]]` | put records on the board; their first look is the baseline; `--watchlist` imports an API-mode file |
 | `remove --id ID… \| --search-id S…` | take records or stored searches off |
 | `annotate` (JSON list on stdin, or `--id ID` with `--label`, `--copy-of`, `--clear-copy`, `--indication`, `--note`) | short names, registry copies, indication groups and notes |
 | `show [--core C] [--brief]` | the board for the chat: summary, changes, worth watching, then the full tables (`--brief` stops after the summary) |
