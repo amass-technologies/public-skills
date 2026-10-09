@@ -1,0 +1,283 @@
+name: taar1-schizophrenia
+question: TAAR1 agonists and ulotaront in schizophrenia and related psychiatric indications
+created: 2026-10-08
+cores: [drugcore, genecore, trialcore, biomedcore, regulatorycore, patentcore]
+include:
+  - Clinical trials (any phase, status or registry) of a TAAR1 agonist in schizophrenia or another psychiatric or neurological indication, including healthy-volunteer and PK studies of such a drug
+  - Papers reporting clinical, translational or pharmacological work on a TAAR1 agonist, or on TAAR1 as a target in psychiatry
+  - Drugs whose mechanism of action includes TAAR1 agonism; the TAAR1 gene record
+  - FDA or EMA authorizations of a TAAR1 agonist
+  - Patents claiming TAAR1 agonist compounds, their formulations or their use in psychiatric disease
+exclude:
+  - Solriamfetol and other drugs where TAAR1 activity is incidental, when studied in sleep or non-psychiatric indications
+  - Trace amine or TAAR1 biology with no agonist drug and no psychiatric angle (olfaction, metabolism, TAAR1 knockout physiology)
+  - Antipsychotic trials that merely use a TAAR1 agonist as a comparator name in background text
+anchors:
+  - core: trialcore
+    id: NCT07759128
+    note: a Phase 3 ulotaront trial a limit-15 search missed on 2026-10-05
+  - core: trialcore
+    id: NCT07225712
+    note: Japanese ulotaront trial (NCT record)
+  - core: trialcore
+    id: JPRN-jRCT2071250092
+    note: the same Japanese trial (jRCT record)
+entities:
+  - name: ulotaront
+    aliases: [SEP-363856, SEP-856, sep363856, ulotaront hydrochloride]
+    kind: drug
+  - name: ralmitaront
+    aliases: [RO6889450, RG7906, RG-7906]
+    kind: drug
+  - name: selutaront
+    kind: drug
+  - name: LK00764
+    kind: drug
+  - name: AP163
+    kind: drug
+  - name: PCC0105004
+    kind: drug
+  - name: TAAR1
+    aliases: [trace amine associated receptor 1, trace amine-associated receptor 1]
+    kind: target
+  - name: TAAR1 agonists
+    aliases: [TAAR1 agonist, TAAR, trace amine]
+    kind: class
+budget:
+  baseline: 100
+  update: 40
+  factor: 1
+intervals:
+  drugcore: 90
+  genecore: 7
+  trialcore: 1
+  biomedcore: 1
+  regulatorycore: 7
+  patentcore: 90
+stopping:
+  consecutive: 2
+  minNew: 2
+queries:
+  - id: D01
+    core: drugcore
+    facet: mechanism
+    query: TAAR1 agonist
+    limit: 50
+    update: true
+  - id: D02
+    core: drugcore
+    facet: drug
+    query: ulotaront SEP-363856
+    limit: 20
+    update: false
+  - id: G01
+    core: genecore
+    facet: target
+    query: TAAR1 trace amine associated receptor 1
+    limit: 3
+    update: true
+  - id: T01
+    core: trialcore
+    facet: drug
+    query: ulotaront
+    filters:
+      interventionType: DRUG
+    limit: 50
+    update: true
+  - id: T02
+    core: trialcore
+    facet: code
+    query: SEP-363856
+    limit: 50
+    update: false
+  - id: T03
+    core: trialcore
+    facet: code
+    query: SEP-856
+    limit: 30
+    update: false
+  - id: T04
+    core: trialcore
+    facet: mechanism
+    query: TAAR1 agonist schizophrenia
+    limit: 50
+    update: true
+  - id: T05
+    core: trialcore
+    facet: mechanism
+    query: trace amine-associated receptor 1 agonist
+    limit: 30
+    update: false
+  - id: T06
+    core: trialcore
+    facet: drug
+    query: ralmitaront RO6889450
+    limit: 30
+    update: false
+  - id: T07
+    core: trialcore
+    facet: sponsor
+    query: Sumitomo Pharma schizophrenia
+    limit: 50
+    update: false
+  - id: B01
+    core: biomedcore
+    facet: drug
+    query: ulotaront
+    limit: 50
+    update: true
+  - id: B02
+    core: biomedcore
+    facet: code
+    query: SEP-363856
+    limit: 50
+    update: false
+  - id: B03
+    core: biomedcore
+    facet: mechanism
+    query: TAAR1 agonist schizophrenia
+    limit: 50
+    update: true
+  - id: B04
+    core: biomedcore
+    facet: mechanism
+    query: trace amine-associated receptor 1 agonist antipsychotic
+    limit: 50
+    update: false
+  - id: B05
+    core: biomedcore
+    facet: drug
+    query: ralmitaront RO6889450
+    limit: 30
+    update: false
+  - id: R01
+    core: regulatorycore
+    facet: drug
+    query: ulotaront
+    limit: 20
+    update: true
+  - id: R02
+    core: regulatorycore
+    facet: mechanism
+    query: TAAR1 agonist
+    limit: 20
+    update: false
+  - id: P01
+    core: patentcore
+    facet: mechanism
+    query: TAAR1 agonist schizophrenia
+    limit: 50
+    update: true
+  - id: P02
+    core: patentcore
+    facet: mechanism
+    query: trace amine associated receptor 1 agonist
+    limit: 50
+    update: false
+  - id: P03
+    core: patentcore
+    facet: drug
+    query: ulotaront SEP-363856
+    limit: 30
+    update: false
+  - id: D03
+    core: drugcore
+    facet: target
+    query: TAAR1
+    limit: 20
+    update: false
+    note: D01 was dominated by the word agonist; bare symbol query
+  - id: D04
+    core: drugcore
+    facet: drug
+    query: ralmitaront RO6889450
+    limit: 10
+    update: false
+  - id: R03
+    core: regulatorycore
+    facet: drug
+    query: ralmitaront
+    limit: 10
+    update: false
+  - id: P04
+    core: patentcore
+    facet: mechanism
+    query: TAAR1 agonist
+    filters:
+      minPublicationDate: 2018-01-01
+    limit: 30
+    update: false
+    note: 2018 floor to get past the 2007-2013 Roche imidazoline series that filled P01/P02; first run un-ingested (agent context ran out), rerun
+  - id: P05
+    core: patentcore
+    facet: sponsor
+    query: TAAR1 agonist
+    filters:
+      assignee: Sunovion,Sumitomo,Sepracor
+    limit: 30
+    update: false
+    note: assignee facet for filings that predate the SEP-363856 code; first run un-ingested, rerun
+  - id: B06
+    core: biomedcore
+    facet: code
+    query: RO5263397 RO5256390 RO5166017 RO5203648
+    limit: 30
+    update: false
+  - id: B07
+    core: biomedcore
+    facet: drug
+    query: ralmitaront RG7906 negative symptoms schizophrenia trial
+    limit: 30
+    update: false
+  - id: B08
+    core: biomedcore
+    facet: mechanism
+    query: TAAR1 agonist depression anxiety substance use disorder
+    limit: 50
+    update: true
+  - id: T08
+    core: trialcore
+    facet: code
+    query: RG7906
+    limit: 30
+    update: false
+  - id: T09
+    core: trialcore
+    facet: code
+    query: SEP363856
+    limit: 30
+    update: false
+  - id: T10
+    core: trialcore
+    facet: sponsor
+    query: Otsuka ulotaront
+    limit: 30
+    update: false
+  - id: D05
+    core: drugcore
+    facet: drug
+    query: selutaront LK00764 AP163 PCC0105004
+    limit: 10
+    update: false
+    note: TAAR1 agonist names surfaced by BiomedCore B03/B08
+  - id: B09
+    core: biomedcore
+    facet: drug
+    query: selutaront
+    limit: 30
+    update: false
+    note: name surfaced by B03/B08
+  - id: B10
+    core: biomedcore
+    facet: code
+    query: LK00764 AP163 PCC0105004 TAAR1 agonist
+    limit: 30
+    update: false
+    note: codes surfaced by B03/B08
+  - id: T11
+    core: trialcore
+    facet: drug
+    query: selutaront LK00764 AP163 PCC0105004
+    limit: 30
+    update: false
+    note: TAAR1 agonist names surfaced by BiomedCore; not in DrugCore
