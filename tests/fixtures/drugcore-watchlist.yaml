@@ -1,0 +1,7 @@
+# Smoke fixture for amass-watchlist-monitor on DrugCore (not one of the numbered API-mode acceptance tests).
+name: drugcore-fixture
+core: drugcore
+ids:
+  - chemblId: CHEMBL941        # imatinib
+  - chemblId: CHEMBL3137343    # pembrolizumab
+cadence: weekly
