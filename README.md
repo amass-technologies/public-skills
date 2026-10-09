@@ -43,7 +43,7 @@ Task-scoped skills that run over the [Amass MCP server](https://amass.tech/mcp),
 
 ## Live examples
 
-Each MCP showcase skill has a validated example in the [Skills & Prompts](https://amass.tech/skills) library (under **Resources**) on the Amass site — the paste-ready prompt, the grounded answer it produced, and a downloadable sample output:
+Each MCP showcase skill and each monitoring skill has a validated example in the [Skills & Prompts](https://amass.tech/skills) library (under **Resources**) on the Amass site — the paste-ready prompt, the grounded answer it produced, and a downloadable sample output:
 
 | Skill | Live example & sample output |
 | --- | --- |
@@ -53,6 +53,8 @@ Each MCP showcase skill has a validated example in the [Skills & Prompts](https:
 | `kol-paper-trial-triangulator` | <https://amass.tech/skills/kol-paper-trial-triangulator> |
 | `orcid-record-self-verify` | <https://amass.tech/skills/orcid-record-self-verify> |
 | `submission-evidence-assembler` | <https://amass.tech/skills/submission-evidence-assembler> |
+| `amass-watchlist-monitor` | <https://amass.tech/skills/amass-watchlist-monitor> |
+| `amass-landscape-monitor` | <https://amass.tech/skills/amass-landscape-monitor> |
 
 Browse the full library at <https://amass.tech/skills>.
 
