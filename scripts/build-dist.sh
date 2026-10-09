@@ -20,6 +20,7 @@ cd "$(dirname "$0")/.."
 SKILLS=(
   amass-biomedical-evidence-scout
   amass-watchlist-monitor
+  amass-landscape-monitor
 )
 
 FIXED_MTIME=202601010000.00   # fixed timestamp -> byte-reproducible archives
