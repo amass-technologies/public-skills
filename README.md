@@ -39,6 +39,7 @@ Task-scoped skills that run over the [Amass MCP server](https://amass.tech/mcp),
 | Skill | What it does |
 | --- | --- |
 | [`amass-watchlist-monitor`](skills/amass-watchlist-monitor) | Keeps a named list of Amass records — trials, papers, FDA/EMA authorizations, drugs, or genes — under watch and reports what changed since the last check: status and stage changes, results posted, label and SmPC revisions, retractions, new cross-links, and records gone from Amass. By default it runs through the Amass MCP connector with no API key (Claude chat, Cowork, Claude Code): the list lives in one Excel board file that is also its memory, and a bundled script (`scripts/board.py`, Python standard library) compares each record field by field. With `AMASS_API_KEY`, `scripts/monitor.py` runs an exact monitor over the REST change feed instead, for automation or long lists. |
+| [`amass-landscape-monitor`](skills/amass-landscape-monitor) | Maps a whole field — a mechanism class in an indication, a target's drug landscape, or a drug and its competitors — across trials, papers, drugs, genes, FDA/EMA authorizations and patents. It searches facet by facet until new queries stop adding records, screens every record against the field's criteria, and delivers a landscape page with charts, a workbook and one ledger per Core; later runs report what is new and what changed, by drug and by Core. Runs through the Amass MCP connector with no API key; a bundled script (`scripts/ledger.py`, Python standard library) keeps the state and computes every figure. |
 
 ## Live examples
 
@@ -72,4 +73,4 @@ The `amass-api` skill needs an Amass API key for direct HTTP calls, and so does 
 export AMASS_API_KEY=amass_…   # add to ~/.zshrc or ~/.bashrc to persist
 ```
 
-The `amass-biomedical-evidence-scout` skill and the five MCP showcase skills run entirely over the [Amass MCP server](https://amass.tech/mcp) — connect it in your agent and no key export is needed. `amass-watchlist-monitor` runs over the MCP server by default too; it also needs a place to run Python (code execution in Claude chat, or a shell in Cowork and Claude Code).
+The `amass-biomedical-evidence-scout` skill and the five MCP showcase skills run entirely over the [Amass MCP server](https://amass.tech/mcp) — connect it in your agent and no key export is needed. `amass-landscape-monitor`, and `amass-watchlist-monitor` by default, run over the MCP server too; both also need a place to run Python (code execution in Claude chat, or a shell in Cowork and Claude Code).

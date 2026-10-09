@@ -7,3 +7,6 @@
 **/digests/
 runs.jsonl
 __pycache__/
+
+# amass-landscape-monitor field folders (never commit)
+landscapes/
