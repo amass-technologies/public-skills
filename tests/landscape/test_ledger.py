@@ -473,8 +473,13 @@ class EndToEnd(unittest.TestCase):
         self.assertIn("unlogged work", err)
         self.ok("finish-core", *self.f, "--core", "trialcore", "--force")
         # biomedcore: both passes, nothing new; a rewritten-unchanged paper
-        self.ok("ingest", *self.f, "--query-id", "B01", "--pass", "created", stdin=json.dumps([
+        out = self.ok("ingest", *self.f, "--query-id", "B01", "--pass", "created", "--returned", "2", stdin=json.dumps([
             {"amassId": "AMBC_aaaaaaaaaaaaaaaa", "title": "Ulotaront RCT", "citationCount": 100}]))
+        # a full page on a dated pass: the advice says what to do, never asks about cost
+        self.assertIn("cap hit on a dated pass", out)
+        self.assertIn("re-fetch the in-scope records when there are few, otherwise split the query by facet", out)
+        self.assertNotIn("credit", out.lower())
+        self.assertNotIn("ask before", out)
         out = self.ok("ingest", *self.f, "--query-id", "B01", "--pass", "updated", stdin=json.dumps([
             {"amassId": "AMBC_aaaaaaaaaaaaaaaa", "title": "Ulotaront RCT", "citationCount": 101}]))
         self.assertIn("changed 1", out)
