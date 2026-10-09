@@ -333,9 +333,20 @@ class EndToEnd(unittest.TestCase):
         self.assertIn("added T03", out)
         text = (self.dir / "field.yaml").read_text()
         self.assertIn("phase: [PHASE2, PHASE3]", text)
+        field = ledger.Field(self.dir)
+        recall = ledger._crosslink_recall(field, {c: ledger.load_ledger(field, ledger.CORES[c]) for c in field.cores})
+        self.assertEqual(recall["trialcore"], {"linked": 3, "search": 1, "fetch": 1, "open": 1, "dismissed": 0})
         self.ok("ingest", *self.f, "--query-id", "T03", stdin=json.dumps([T3, cand]))
         out = self.ok("anchors", *self.f)
         self.assertIn("2 of 2 anchors found by search", out)
+        # the linked trial was a candidate, fetched, then returned by T03: it now counts as reached by search
+        # (AMTC_ffff... stays open: the crosscheck above named it)
+        field = ledger.Field(self.dir)
+        recall = ledger._crosslink_recall(field, {c: ledger.load_ledger(field, ledger.CORES[c]) for c in field.cores})
+        self.assertEqual(recall["trialcore"], {"linked": 3, "search": 2, "fetch": 0, "open": 1, "dismissed": 0})
+        self.assertEqual(ledger._crosslink_sentence("TrialCore", recall["trialcore"]),
+                         "Cross-links: of 3 TrialCore ids linked from in-scope records: 2 reached by search, "
+                         "0 only by fetch, 1 still open, 0 out of scope by design.")
         out = self.ok("saturation", *self.f)
         self.assertIn("T01:2/2/1! T02:2/1/1! T03:2/0/0!", out)
 

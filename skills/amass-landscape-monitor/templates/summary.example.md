@@ -54,10 +54,10 @@ Skipped (not due): BiomedCore, PatentCore
 | PatentCore | 45 | 13 | 115 | 5 | 2026-10-08 | 90d |
 
 Anchors: 3 of 3 found by search.
-Cross-links: of 1 BiomedCore ids linked from in-scope records, the searches had reached 0 when checked; 1 reached afterwards, 0 still open, 0 out of scope by design.
-Cross-links: of 2 GeneCore ids linked from in-scope records, the searches had reached 1 when checked; 0 reached afterwards, 0 still open, 1 out of scope by design.
-Cross-links: of 32 TrialCore ids linked from in-scope records, the searches had reached 0 when checked; 32 reached afterwards, 0 still open, 0 out of scope by design.
-Cross-links: of 1 DrugCore ids linked from in-scope records, the searches had reached 1 when checked; 0 reached afterwards, 0 still open, 0 out of scope by design.
+Cross-links: of 1 BiomedCore ids linked from in-scope records: 1 reached by search, 0 only by fetch, 0 still open, 0 out of scope by design.
+Cross-links: of 2 GeneCore ids linked from in-scope records: 1 reached by search, 0 only by fetch, 0 still open, 1 out of scope by design.
+Cross-links: of 32 TrialCore ids linked from in-scope records: 32 reached by search, 0 only by fetch, 0 still open, 0 out of scope by design.
+Cross-links: of 1 DrugCore ids linked from in-scope records: 1 reached by search, 0 only by fetch, 0 still open, 0 out of scope by design.
 Saturated facets: DrugCore drug, TrialCore code, TrialCore mechanism, TrialCore sponsor, BiomedCore drug, RegulatoryCore drug. Still producing: DrugCore mechanism, DrugCore target, GeneCore target, TrialCore drug, BiomedCore code, BiomedCore mechanism, RegulatoryCore mechanism, PatentCore mechanism, PatentCore drug, PatentCore sponsor.
 Unsure records to settle: 23 (4 TrialCore, 6 BiomedCore, 13 PatentCore).
 

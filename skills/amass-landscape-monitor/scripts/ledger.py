@@ -2466,8 +2466,10 @@ def _ledgers(field: Field) -> dict[str, dict[str, dict]]:
 
 
 def _crosslink_recall(field: Field, ledgers: dict[str, dict[str, dict]]) -> dict[str, dict[str, int]]:
-    """Per target Core: ids linked from in-scope records, how many the searches had reached when checked,
-    how many were reached afterwards (fetch or later search), how many are still open."""
+    """Per target Core: ids linked from in-scope records, and how each was reached. `search`: a search returned
+    it, before or after the link was seen (drug records are fetched before the searches run, so most links are
+    candidates first and searches resolve them). `fetch`: only a fetch reached it, the plan's known gap. `open`:
+    not reached yet. `dismissed`: out of scope by design."""
     out: dict[str, dict[str, int]] = {}
     cands = load_candidates(field)
     for core_name, ledger in ledgers.items():
@@ -2477,19 +2479,27 @@ def _crosslink_recall(field: Field, ledgers: dict[str, dict[str, dict]]) -> dict
             for part in _split(row["links"]):
                 target, _, n = part.partition(":")
                 if target in CORES and n.isdigit():
-                    o = out.setdefault(target, {"linked": 0, "missed": 0, "reached_later": 0, "open": 0, "dismissed": 0})
+                    o = out.setdefault(target, {"linked": 0, "search": 0, "fetch": 0, "open": 0, "dismissed": 0})
                     o["linked"] += int(n)
     for c in cands:
         if c["core"] in out and c["source"]:
             o = out[c["core"]]
-            o["missed"] += 1
             if c["status"] == "resolved":
-                o["reached_later"] += 1
+                row = ledgers.get(c["core"], {}).get(c["amassId"])
+                if row is None or row.get("source") != "search":
+                    o["fetch"] += 1
             elif c["status"] == "dismissed":
                 o["dismissed"] += 1
             else:
                 o["open"] += 1
+    for o in out.values():
+        o["search"] = max(o["linked"] - o["fetch"] - o["open"] - o["dismissed"], 0)
     return out
+
+
+def _crosslink_sentence(label: str, o: dict[str, int]) -> str:
+    return (f"Cross-links: of {o['linked']} {label} ids linked from in-scope records: {o['search']} reached by search, "
+            f"{o['fetch']} only by fetch, {o['open']} still open, {o['dismissed']} out of scope by design.")
 
 
 def _saturation_words(field: Field) -> tuple[list[str], list[str]]:
@@ -2613,9 +2623,7 @@ def render_summary(field: Field, run_id: str | None) -> str:
     recall = _crosslink_recall(field, ledgers)
     for target, o in recall.items():
         if o["linked"]:
-            reached = o["linked"] - o["missed"]
-            lines.append(f"Cross-links: of {o['linked']} {CORES[target].label} ids linked from in-scope records, the searches had reached "
-                         f"{reached} when checked; {o['reached_later']} reached afterwards, {o['open']} still open, {o['dismissed']} out of scope by design.")
+            lines.append(_crosslink_sentence(CORES[target].label, o))
     saturated, producing = _saturation_words(field)
     if saturated or producing:
         lines.append("Saturated facets: " + (", ".join(saturated) or "none") + ". Still producing: " + (", ".join(producing) or "none") + ".")
@@ -2840,8 +2848,7 @@ def write_workbook(field: Field, run_id: str | None) -> None:
             L.append(["", a["core"], a["id"], a["status"], a["note"]])
     for target, o in _crosslink_recall(field, ledgers).items():
         if o["linked"]:
-            L.append([f"Cross-links: of {o['linked']} {CORES[target].label} ids linked from in-scope records, the searches had reached {o['linked'] - o['missed']} when checked; "
-                      f"{o['reached_later']} reached afterwards, {o['open']} still open, {o['dismissed']} out of scope by design."])
+            L.append([_crosslink_sentence(CORES[target].label, o)])
     saturated, producing = _saturation_words(field)
     if saturated or producing:
         L.append(["Saturated facets: " + (", ".join(saturated) or "none") + "."])
@@ -3286,8 +3293,8 @@ def write_landscape_html(field: Field, run_id: str | None) -> None:
         H.append(f'<div class="tile"><div class="label">Anchor records found by search</div><div class="value">{found} of {len(anchors)}</div><div class="note">records that had to be in the field</div></div>')
     for target, o in recall.items():
         if o["linked"]:
-            H.append(f'<div class="tile"><div class="label">Linked {_h(CORES[target].label)} reached by search</div><div class="value">{o["linked"] - o["missed"]} of {o["linked"]}</div>'
-                     f'<div class="note">{o["reached_later"]} reached afterwards, {o["open"]} open, {o["dismissed"]} out of scope by design</div></div>')
+            H.append(f'<div class="tile"><div class="label">Linked {_h(CORES[target].label)} reached by search</div><div class="value">{o["search"]} of {o["linked"]}</div>'
+                     f'<div class="note">{o["fetch"]} only by fetch, {o["open"]} open, {o["dismissed"]} out of scope by design</div></div>')
     H.append(f'<div class="tile"><div class="label">Search facets</div><div class="value">{len(saturated)} / {len(saturated) + len(producing)}</div><div class="note">saturated, of those run</div></div>')
     H.append(f'<div class="tile"><div class="label">Unsure records</div><div class="value">{total_unsure}</div><div class="note">' + _h(", ".join(f"{counts[c]['unsure']} {CORES[c].label}" for c in field.cores if counts[c]["unsure"]) or "none to settle") + "</div></div>")
     H.append("</div>")
