@@ -62,6 +62,7 @@ Most agents install skills straight from source — via `npx skills` above, or b
 
 - [`amass-biomedical-evidence-scout.skill`](dist/amass-biomedical-evidence-scout.skill) / [`.zip`](dist/amass-biomedical-evidence-scout.zip)
 - [`amass-watchlist-monitor.skill`](dist/amass-watchlist-monitor.skill) / [`.zip`](dist/amass-watchlist-monitor.zip)
+- [`amass-landscape-monitor.skill`](dist/amass-landscape-monitor.skill) / [`.zip`](dist/amass-landscape-monitor.zip)
 
 Each package holds the skill's whole folder: its `SKILL.md` plus any scripts, references and templates. Rebuild them from the committed sources with `scripts/build-dist.sh`. Rerun it whenever a packaged skill changes, so the download never drifts behind the source.
 
