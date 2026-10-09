@@ -737,7 +737,7 @@ def normalise_field(data: Any, source: str = "field.yaml") -> tuple[dict, list[s
         if key in raw_budget:
             v = raw_budget[key]
             if isinstance(v, bool) or not isinstance(v, int) or v <= 0:
-                errors.append(f"budget.{key}: positive integer credits")
+                errors.append(f"budget.{key}: a positive integer")
             else:
                 budget[key] = v
     if "factor" in raw_budget:
@@ -1412,15 +1412,15 @@ def cmd_plan(args: argparse.Namespace) -> int:
     snowball = 5 * len([c for c in field.cores if c in ("drugcore", "trialcore")])
     reserve = CREDITS["fetch"] * (anchors_fetch + snowball) * factor
     print()
-    print(f"planned searches: {len(rows)} -> {fmt_credits(total_credits)} credits")
-    print(f"fetch reserve (anchors {anchors_fetch} + snowball {snowball}): {fmt_credits(reserve)} credits")
+    print(f"planned searches: {len(rows)} -> {fmt_credits(total_credits)} of the run cap")
+    print(f"fetch reserve (anchors {anchors_fetch} + snowball {snowball}): {fmt_credits(reserve)}")
     expansion = round(total_credits * 0.3)
-    print(f"expansion reserve (30% of searches): {expansion} credits")
+    print(f"expansion reserve (30% of searches): {expansion}")
     estimate = total_credits + reserve + expansion
-    print(f"estimate: about {fmt_credits(estimate)} nominal credits (budget.baseline {field.data['budget']['baseline']})")
+    print(f"estimate: about {fmt_credits(estimate)} of the run cap of {field.data['budget']['baseline']} (search 2, fetch 1)")
     print(f"context: about {total_tokens // 1000}k tokens of search results if run in one context; fan out per Core or work in rounds")
     if estimate > field.data["budget"]["baseline"]:
-        print("warning: the estimate exceeds budget.baseline; raise the budget or trim the plan before asking for a go")
+        print("warning: the estimate exceeds the run cap (budget.baseline); trim the plan")
     return 0
 
 
@@ -1475,12 +1475,12 @@ def cmd_start_run(args: argparse.Namespace) -> int:
                 in_scope = sum(1 for r in ledger.values() if r["decision"] == "in")
                 if core_name == "patentcore":
                     print(f"  {core_name}: since {row['since']}, one pass (published) over {len(qs)} queries: "
-                          f"{fmt_credits(CREDITS['search'] * len(qs) * factor)} credits. No Amass dates on PatentCore search: "
+                          f"{fmt_credits(CREDITS['search'] * len(qs) * factor)} of the run cap. No Amass dates on PatentCore search: "
                           "this finds newly published patents only.")
                     continue
                 by_search = CREDITS["search"] * len(qs) * factor
                 by_fetch = CREDITS["fetch"] * in_scope * factor
-                print(f"  {core_name}: since {row['since']}; pass created over {len(qs)} queries = {fmt_credits(by_search)} credits; "
+                print(f"  {core_name}: since {row['since']}; pass created over {len(qs)} queries = {fmt_credits(by_search)} of the run cap; "
                       f"pass updated by search = {fmt_credits(by_search)} or by re-fetching {in_scope} in-scope records = "
                       f"{fmt_credits(by_fetch)} -> " + ("re-fetch" if by_fetch < by_search else "search"))
         save_runs(field, runs + new_rows)
@@ -1785,9 +1785,10 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if open_cands:
         print(f"  open candidates (linked ids not in any ledger): {open_cands}")
     remaining = budget - run_credits
-    print(f"  credits this run {fmt_credits(run_credits)} of {budget} ({mode} budget); remaining {fmt_credits(remaining)}")
+    print(f"  run cap: {fmt_credits(run_credits)} of {budget} used ({mode})")
     if remaining < 0:
-        print("  OVER BUDGET: stop and ask before spending more")
+        print("  RUN CAP REACHED: make no more calls. Close the Cores (finish-core, then finish-run), write the "
+              "briefing and report what is mapped; the field can be extended in a later run.")
         return 2
     return 0
 
@@ -2048,8 +2049,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     d = field.data
     print(f"field {d['name']}: {d['question']}")
     spent = credits_spent(field)
-    print(f"credits: baseline {fmt_credits(spent['baseline'])} of {d['budget']['baseline']}, "
-          f"updates {fmt_credits(spent['update'])} (budget {d['budget']['update']} per run), total {fmt_credits(spent['total'])}")
+    print(f"run cap: baseline {fmt_credits(spent['baseline'])} of {d['budget']['baseline']} used, "
+          f"updates {fmt_credits(spent['update'])} (cap {d['budget']['update']} per run), total {fmt_credits(spent['total'])}")
     run_id, open_rows = open_run(field)
     checked = last_checked(field)
     print(f"{'core':15} {'records':>7} {'in':>4} {'out':>4} {'unsure':>6} {'queries':>7} {'last checked':13}")
@@ -2061,7 +2062,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         mode = open_rows[0]["mode"]
         run_credits = sum(float(r["credits"] or 0) for r in load_runs(field) if r["runId"] == run_id)
         print(f"\nopen run {run_id} ({mode}) for {', '.join(r['core'] for r in open_rows)}; "
-              f"{fmt_credits(run_credits)} of {d['budget'][mode]} credits spent")
+              f"{fmt_credits(run_credits)} of its run cap of {d['budget'][mode]} used")
         progress = plan_progress(field, run_id, mode)
         log_now = load_queries_log(field)
         for r in open_rows:
@@ -2549,7 +2550,6 @@ def render_summary(field: Field, run_id: str | None) -> str:
     changes = [c for c in load_changes(field) if c["runId"] == run_id] if run_id else []
     log = load_queries_log(field)
     checked = last_checked(field)
-    spent = credits_spent(field)
     ledgers = _ledgers(field)
     counts = {c: ledger_counts(field, c) for c in field.cores}
     lines = [f"# {d['name']}: {mode} run {run_id or '(none)'}, {utc_today().isoformat()}", "",
@@ -2640,8 +2640,6 @@ def render_summary(field: Field, run_id: str | None) -> str:
               "and in-place publicationDate corrections; the REST change feed used by amass-watchlist-monitor sees those. "
               "PatentCore carries no Amass dates on MCP, so its updates find newly published patents only. A record rewritten "
               "by Amass is not a change; only a differing tracked column is.", ""]
-    lines += ["## Credits", "", f"Baseline {fmt_credits(spent['baseline'])}; updates {fmt_credits(spent['update'])}; total "
-              f"{fmt_credits(spent['total'])} nominal credits (search 2, fetch 1). For the plan owner; not relayed in chat.", ""]
     return "\n".join(lines) + "\n"
 
 
@@ -2908,7 +2906,8 @@ def write_workbook(field: Field, run_id: str | None) -> None:
 
     # ---- logs ----
     changes = load_changes(field)
-    sheets.append(Sheet("Queries", list(QUERY_LOG_COLUMNS), [[e[k] for k in QUERY_LOG_COLUMNS] for e in log]))
+    shown = [k for k in QUERY_LOG_COLUMNS if k != "credits"]  # the call count stays in log/queries.csv, out of the workbook
+    sheets.append(Sheet("Queries", shown, [[e[k] for k in shown] for e in log]))
     cands = load_candidates(field)
     sheets.append(Sheet("Candidates", list(CANDIDATE_COLUMNS), [[c[k] for k in CANDIDATE_COLUMNS] for c in cands]))
     sheets.append(Sheet("Changes", list(CHANGE_COLUMNS), [[c[k] for k in CHANGE_COLUMNS] for c in changes if c["class"] not in NEW_CLASSES]))

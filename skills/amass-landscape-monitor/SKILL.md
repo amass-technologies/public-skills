@@ -237,9 +237,11 @@ BiomedCore, 6 PatentCore), `medium` for a target with several drugs (16, 12, 8),
 class across indications (24, 16, 10). `add-query` refuses a query past the Core's allowance,
 and `ingest` says how much is used; a plan that is bigger than its allowance is a plan that was
 written before measuring. Stop a Core when every facet is saturated or the allowance is used,
-whichever comes first, and leave the rest to "extend". Do not probe DrugCore for the codes the
-literature surfaces, and give the sponsor facet only to sponsors that appear on in-scope records
-or to roster drugs that have no trial yet.
+whichever comes first, and leave the rest to "extend". Each run also has a cap on its calls
+(`budget` in `field.yaml`): when `ingest` says `RUN CAP REACHED` (exit code 2), make no more calls,
+close the Cores, write the briefing and report what is mapped, offering "extend". Do not probe
+DrugCore for the codes the literature surfaces, and give the sponsor facet only to sponsors that
+appear on in-scope records or to roster drugs that have no trial yet.
 
 **Unsure is for judgment calls, not for a category.** When the same kind of record keeps landing
 unsure (broad class reviews that mention the field in passing, basic physiology without a drug,
@@ -456,8 +458,8 @@ metadata changes as counts, not news.
 Ingest rows are flat JSON objects: `amassId`, `decision`, `reason`, then tracked columns by
 their names above; `links` is an object mapping a Core name to a list of Amass ids. Unknown keys,
 bad enums, non-ISO dates and ids of the wrong Core reject the batch with the reason, and nothing
-is written. The helper logs nominal credits per call for the plan owner's records; those figures
-are in the files and the summary's last section, never in the chat.
+is written. The helper counts its calls in `log/` to hold each run to its cap; the count appears in
+no deliverable and never in the chat.
 
 ## Worked example
 
@@ -540,8 +542,8 @@ anchors; fetching the 18 drug-linked trials the searches had missed found 17 in 
 run on amylin analogues in obesity logged 126 calls in 22 minutes sequentially: 225 trials, 260
 papers, 111 patents, 6 of 6 anchors, 95 of 121 drug-linked trials reached by search and the rest
 fetched. Before the allowance existed that run planned 97 searches, 28 of which added nothing,
-and left 106 records unsure before the category rule existed. A search costs 2 nominal credits
-whatever its limit and a fetch 1; the helper logs them for the plan owner.
+and left 106 records unsure before the category rule existed. A search returns up to 50 records in
+one call whatever its limit, so a larger limit adds no call.
 
 ## Limits
 

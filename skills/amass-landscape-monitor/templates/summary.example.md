@@ -70,8 +70,3 @@ Unsure records to settle: 23 (4 TrialCore, 6 BiomedCore, 13 PatentCore).
 ## What this cannot see
 
 Search is relevance-ranked and capped per call, so the map is as complete as the plan and its saturation say. Date-filtered searches miss deletions, results-only revisions on trials, label and SmPC section-only revisions, and in-place publicationDate corrections; the REST change feed used by amass-watchlist-monitor sees those. PatentCore carries no Amass dates on MCP, so its updates find newly published patents only. A record rewritten by Amass is not a change; only a differing tracked column is.
-
-## Credits
-
-Baseline 73; updates 20; total 93 nominal credits (search 2, fetch 1). For the plan owner; not relayed in chat.
-

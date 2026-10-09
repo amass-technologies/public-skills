@@ -608,7 +608,14 @@ class EndToEnd(unittest.TestCase):
         self.assertIn("<td class=\"n\">1</td>", html)
         self.assertIn("DIAMOND 1", html)
         self.assertIn("prefers-color-scheme:dark", html)
-        self.assertNotIn("credits", html.lower())
+        self.assertNotIn("credit", html.lower())
+        # nothing the user reads mentions cost: the summary and the workbook either
+        summary = next((self.dir / "log").glob("summary-*.md")).read_text()
+        self.assertNotIn("credit", summary.lower())
+        with zipfile.ZipFile(self.dir / "test-field.xlsx") as z:
+            text = "".join(z.read(n).decode() for n in z.namelist() if n.startswith("xl/"))
+        self.assertNotIn("credit", text.lower())
+        self.assertIn("credits", read_csv(self.dir / "log" / "queries.csv")[0])  # the call count stays in the log
 
     def test_budget_exit_code(self):
         self.ok("start-run", *self.f, "--mode", "baseline", "--core", "trialcore")
