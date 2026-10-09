@@ -1,0 +1,7 @@
+# Smoke fixture for amass-watchlist-monitor on GeneCore (not one of the numbered API-mode acceptance tests).
+name: genecore-fixture
+core: genecore
+ids:
+  - symbol: EGFR
+  - ensemblGeneId: ENSG00000133703   # KRAS
+cadence: weekly

@@ -1,0 +1,16 @@
+# Example watchlist for the amass-watchlist-monitor skill.
+# Copy it, rename it, put your own ids in. One Core per file; run one file per Core.
+name: example-trials
+core: trialcore
+ids:
+  # Amass IDs are used as they are.
+  - AMTC_UOVYXZ2dY42Kn663vgBL0221KY4   # NCT07759128, Phase 3, recruiting
+  - AMTC_KGCxl0fhol8AzsKSl4lwafcHyxW   # NCT07066254, withdrawn
+  # External ids are looked up once on the first run and remembered.
+  - nctId: NCT04907084                 # results first posted 2026-09-21
+# Optional: fields to fetch and watch on top of the Core's defaults
+# (TrialCore always fetches outcomes and referencesBiomedCore).
+include: [referencesDrugCore]
+# Informational; scheduling is up to you. Daily suits TrialCore and BiomedCore,
+# weekly suits RegulatoryCore, DrugCore and GeneCore.
+cadence: daily

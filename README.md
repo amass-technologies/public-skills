@@ -34,6 +34,12 @@ Task-scoped skills that run over the [Amass MCP server](https://amass.tech/mcp),
 | [`orcid-record-self-verify`](skills/orcid-record-self-verify) | Self-audits your own ORCID-linked publication record for integrity — retractions, below-peer-review journals, and trial linkage — before a grant, tenure, or promotion submission. |
 | [`submission-evidence-assembler`](skills/submission-evidence-assembler) | Assembles a citation-auditable, Module-2.5-style evidence narrative for a drug asset — every pivotal Phase-3 trial and the papers that describe it — as a `.docx` narrative plus an `.xlsx` trial×paper matrix. |
 
+### Monitoring skills
+
+| Skill | What it does |
+| --- | --- |
+| [`amass-watchlist-monitor`](skills/amass-watchlist-monitor) | Keeps a named list of Amass records — trials, papers, FDA/EMA authorizations, drugs, or genes — under watch and reports what changed since the last check: status and stage changes, results posted, label and SmPC revisions, retractions, new cross-links, and records gone from Amass. By default it runs through the Amass MCP connector with no API key (Claude chat, Cowork, Claude Code): the list lives in one Excel board file that is also its memory, and a bundled script (`scripts/board.py`, Python standard library) compares each record field by field. With `AMASS_API_KEY`, `scripts/monitor.py` runs an exact monitor over the REST change feed instead, for automation or long lists. |
+
 ## Live examples
 
 Each MCP showcase skill has a validated example in the [Skills & Prompts](https://amass.tech/skills) library (under **Resources**) on the Amass site — the paste-ready prompt, the grounded answer it produced, and a downloadable sample output:
@@ -51,18 +57,19 @@ Browse the full library at <https://amass.tech/skills>.
 
 ## Packaged downloads
 
-Most agents install skills straight from source — via `npx skills` above, or by dropping a `SKILL.md` into the tool's skills directory. For tools that take a packaged file, prebuilt `.skill` (double-click to install in Claude) and `.zip` archives live in [`dist/`](dist):
+Most agents install skills straight from source — via `npx skills` above, or by dropping a skill's folder into the tool's skills directory. For tools that take a packaged file, prebuilt `.skill` (double-click to install in Claude) and `.zip` archives live in [`dist/`](dist):
 
 - [`amass-biomedical-evidence-scout.skill`](dist/amass-biomedical-evidence-scout.skill) / [`.zip`](dist/amass-biomedical-evidence-scout.zip)
+- [`amass-watchlist-monitor.skill`](dist/amass-watchlist-monitor.skill) / [`.zip`](dist/amass-watchlist-monitor.zip)
 
-Rebuild them from the current `SKILL.md` with `scripts/build-dist.sh`. Rerun it whenever a packaged skill changes, so the download never drifts behind the source.
+Each package holds the skill's whole folder: its `SKILL.md` plus any scripts, references and templates. Rebuild them from the committed sources with `scripts/build-dist.sh`. Rerun it whenever a packaged skill changes, so the download never drifts behind the source.
 
 ## Setup
 
-The `amass-api` skill needs an Amass API key for direct HTTP calls. Get one at <https://platform.amass.tech>, then export it in your shell:
+The `amass-api` skill needs an Amass API key for direct HTTP calls, and so does the optional API mode of `amass-watchlist-monitor`. Get one at <https://platform.amass.tech>, then export it in your shell:
 
 ```bash
 export AMASS_API_KEY=amass_…   # add to ~/.zshrc or ~/.bashrc to persist
 ```
 
-The `amass-biomedical-evidence-scout` skill and the five MCP showcase skills run entirely over the [Amass MCP server](https://amass.tech/mcp) — connect it in your agent and no key export is needed.
+The `amass-biomedical-evidence-scout` skill and the five MCP showcase skills run entirely over the [Amass MCP server](https://amass.tech/mcp) — connect it in your agent and no key export is needed. `amass-watchlist-monitor` runs over the MCP server by default too; it also needs a place to run Python (code execution in Claude chat, or a shell in Cowork and Claude Code).

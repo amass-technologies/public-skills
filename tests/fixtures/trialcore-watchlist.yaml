@@ -1,0 +1,9 @@
+# Acceptance fixture for amass-watchlist-monitor (API-mode acceptance tests 1-4, 6, 10).
+# Three TrialCore trials picked live on 2026-10-05 via TrialCore search:
+name: trialcore-fixture
+core: trialcore
+ids:
+  - AMTC_KGCxl0fhol8AzsKSl4lwafcHyxW   # NCT07066254, overallStatus WITHDRAWN
+  - AMTC_NOGpeSN9g9AS8zST4wJmGXmNbdW   # NCT04907084, hasResults true (results first posted 2026-09-21)
+  - AMTC_UOVYXZ2dY42Kn663vgBL0221KY4   # NCT07759128, overallStatus RECRUITING
+cadence: daily

@@ -1,0 +1,13 @@
+# Acceptance fixture for amass-watchlist-monitor (API-mode acceptance test 7).
+# Four EMA authorizations seen as `unchanged` with document sections on the
+# RegulatoryCore feed between 2026-08-06 and 2026-10-05 (sampled live on 2026-10-05),
+# plus one FDA authorization given by application number to exercise lookup.
+name: regulatorycore-fixture
+core: regulatorycore
+ids:
+  - AMRC_7sRrkRz5epib8eFwH42AZ8Gq52k   # Livtencity (maribavir), EMA
+  - AMRC_XPvVxD2Kxb1askJv4F1d2yKngdv
+  - AMRC_KPsjNRJzfn22NI5balH39p1QFHZ
+  - AMRC_ZQraysRUowHR9TsRD3R9smrpm01
+  - fdaApplicationNumber: BLA125514    # Keytruda (pembrolizumab), FDA
+cadence: weekly

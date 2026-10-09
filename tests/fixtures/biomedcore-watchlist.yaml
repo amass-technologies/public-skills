@@ -1,0 +1,58 @@
+# Acceptance fixture for amass-watchlist-monitor (API-mode acceptance test 8).
+# 50 BiomedCore papers from one search on 2026-10-05: query "cancer immunotherapy",
+# minCitationCount 20, minLastUpdateDate 2026-09-10, maxLastUpdateDate 2026-10-03.
+# The last ten are given as PMIDs to exercise lookup.
+name: biomedcore-fixture
+core: biomedcore
+ids:
+  - AMBC_F8MTzKw2tmo81o8CwYWNA2kEa4V
+  - AMBC_U4pCMOdyCgiC7cPcO0wOabjpRUZ
+  - AMBC_ZcnMZRFaUfUkl0TWfN0eslff6s0
+  - AMBC_VZG3OGN8epdQMkWgD8GgKtlQ5pD
+  - AMBC_IVVtLT9Y0EMX1AXWfvs89idhGqg
+  - AMBC_4YHzKR8s9gLmV3iNvHJmXcjip1A
+  - AMBC_73tuYuVwHncu3wO4eO7Qk7WPubK
+  - AMBC_SBPuua2XEAef8aR3tAMLAaZa7j9
+  - AMBC_KoiZrKCcA2QKMLwVizZ3PysZxG9
+  - AMBC_ISoADlLmG1ty2OwPVOFkiWikNwT
+  - AMBC_OacCkJn5u2mbUlbd9dRSesXmYRV
+  - AMBC_Io7IEqC74u2AEj7Y1XiW9hi4Sls
+  - AMBC_HawmR6WLfapIN88vYjE0pb3YhhY
+  - AMBC_1gkF5E9uWN1UqNf0cxJSx2iHo6Z
+  - AMBC_XMcNrdv0KHefQBUyFZLF4r8Ku0e
+  - AMBC_S0gHsgu09bKGqkYGTEf7rUR2arf
+  - AMBC_I0bKVaaX0q61y6lCw7CyPuJl1E9
+  - AMBC_Mb4mIrSxCKDqq9pn3TTjvHVcllS
+  - AMBC_Hsrretf7pt114hYAwlGB8CtPV1J
+  - AMBC_EhzhLVUrGMf4FF2fPSV2o3jRZcV
+  - AMBC_9oXwVPUlZGpfY1IGm8NavQsxoO1
+  - AMBC_LhOfrUibGOvnsrcZbDZSvOXpxss
+  - AMBC_HbB0hPaNLMJxfAd0Cgx6lm3rbsC
+  - AMBC_HgYOGpt3FEBvsvjK0ZyetCHoYn2
+  - AMBC_IMFYLpfdhaFRUd2h4maKckdQMby
+  - AMBC_CDXacK8bZX8fQkQuiVutY12tRlj
+  - AMBC_3S2xyAN1Iyn8WaYj2aiAoR8CM6r
+  - AMBC_9mThoTrLR4VcSoe9V3GgdAsA5RC
+  - AMBC_Xe0NFob71bUESx3ew97gWzRPGET
+  - AMBC_QZBcRyNQAgQ8d4YyAwC2ZSrLcNz
+  - AMBC_2MW1bXe6ArtQM3zWeeAfGe4QFMy
+  - AMBC_IQcaQF7WW23mp0Acarph0tEcjIp
+  - AMBC_9AMU6uPOsaz3seNjtCih5tBnUR3
+  - AMBC_GHSc2Km49AS1u1YyoOK0tgV2ZV7
+  - AMBC_4MMFxxTkRC9pXjrLnOLeB978q8L
+  - AMBC_HC3TWusAPhaj20twdFlPXCJgjbA
+  - AMBC_2g26WwSOOjtuz9z6ruUnmYiTTJM
+  - AMBC_EpiiswNgm2FkLkkaZsDWEP0rJ4t
+  - AMBC_6wVgGnKFletOFqfLmqEqRdEeuL3
+  - AMBC_656tYYrKmYae7nj9I73tiCiKZGm
+  - pmid: "31695807"
+  - pmid: "31487832"
+  - pmid: "35594163"
+  - pmid: "30518139"
+  - pmid: "36159668"
+  - pmid: "34766108"
+  - pmid: "30003186"
+  - pmid: "20425628"
+  - pmid: "34796689"
+  - pmid: "35524277"
+cadence: daily
