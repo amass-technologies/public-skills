@@ -89,7 +89,7 @@ itself; when it says no, the section "When Amass says no" applies.
 
    ```bash
    python3 <skill folder>/scripts/board.py add <board> --core trialcore --search "ulotaront" --filter phase=PHASE3 --limit 50 <<'EOF'
-   [{"amassId": "AMTC_…", "nctId": "NCT0…", "registryId": "NCT0…", "sourceRegistry": "clinicaltrials_gov", "url": "https://…", "briefTitle": "…", "acronym": null, "sponsorName": "…", "phase": "PHASE3", "overallStatus": "COMPLETED", "studyType": "INTERVENTIONAL", "startDate": "2019-11-01", "completionDate": "2023-02-01", "enrollment": 435, "conditions": ["Schizophrenia"], "interventionNames": ["SEP-363856", "Placebo"], "interventionTypes": ["DRUG"], "facilityCountries": ["US"], "hasResults": true}]
+   [{"amassId": "AMTC_…", "nctId": "NCT0…", "registryId": "NCT0…", "sourceRegistry": "clinicaltrials_gov", "url": "https://…", "briefTitle": "…", "acronym": null, "sponsorName": "…", "phase": "PHASE3", "overallStatus": "COMPLETED", "whyStopped": null, "studyType": "INTERVENTIONAL", "startDate": "2019-11-01", "completionDate": "2023-02-01", "enrollment": 435, "conditions": ["Schizophrenia"], "interventionNames": ["SEP-363856", "Placebo"], "interventionTypes": ["DRUG"], "facilityCountries": ["US"], "hasResults": true}]
    EOF
    ```
 
@@ -253,8 +253,8 @@ once; neither is mentioned to the user.
 
 | Core | Interval | Quick check | Tracked | Not visible over MCP |
 | --- | --- | --- | --- | --- |
-| TrialCore | 1 day | yes | status, phase, enrollment, start and completion dates, results posted; title, acronym, sponsor, study type, conditions, interventions, countries; linked papers and drugs (fetch) | results revised after the first posting, outcomes, why a trial stopped |
-| BiomedCore | 1 day | yes | retracted; title, journal, publication date; linked trials (fetch); citations, full text, JuFo level as metadata | errata and expressions of concern (no publication types over MCP yet) |
+| TrialCore | 1 day | yes | status, why stopped, phase, enrollment, start and completion dates, results posted; title, acronym, sponsor, study type, conditions, interventions, countries; linked papers and drugs (fetch) | results revised after the first posting, outcomes |
+| BiomedCore | 1 day | yes | retracted, publication types (errata and expressions of concern); title, journal, publication date; linked trials (fetch); citations, full text, JuFo level as metadata | |
 | RegulatoryCore | 7 days | no | status, orphan flag, designations, withdrawal and refusal dates; FDA label date, SmPC date and revision, latest EMA procedure, EC decision date, parsed section count; name, substance, holder; linked drugs; Amass update date | which label or SmPC section changed, section text |
 | DrugCore | 7 days | no | highest stage, modality; name, synonyms, trade names, parent, mechanisms; linked trials, papers, authorizations, genes | the date of change |
 | GeneCore | 7 days | no | symbol, name, type, synonyms, target class, tractability, safety liabilities, DepMap essentiality, LOEUF; linked drugs; Amass update date | the date of change |
@@ -312,9 +312,8 @@ columns of the record sheets belong to the user: what they type there is kept at
 ## What MCP mode cannot see
 
 Say these plainly when the user relies on the watch for them. A trial's results revised after their
-first posting (only the first posting shows, as "results posted"); why a trial stopped; which label or
-SmPC section changed when the revision number and dates stay put; errata and expressions of concern;
-the exact day a change happened (a check sees the state at the time of the check). A record the fetch
+first posting (only the first posting shows, as "results posted"); which label or SmPC section
+changed when the revision number and dates stay put; the exact day a change happened (a check sees the state at the time of the check). A record the fetch
 tool cannot find is reported as not found; that can be a removal at the source or an Amass hiccup, so
 it is checked again next time. API mode sees all of these.
 

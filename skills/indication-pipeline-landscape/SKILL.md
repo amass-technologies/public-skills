@@ -56,7 +56,7 @@ string — the search engine treats them as garbage tokens.
    `get_amass_trialcore_record(type="nctId", value=<NCT>)`. Read `referencesBiomedCore` — the array
    of `AMBC_` IDs of publications describing the trial. Its **length** is the program's
    `evidence_paper_count`. Also read the identity fields verbatim: `acronym`, `interventionNames`,
-   `sponsorName`, `phase`, `overallStatus`, `hasResults`.
+   `sponsorName`, `phase`, `overallStatus`, `whyStopped`, `hasResults`.
    - **Rate-limit batching (fan-out):** keep each batch to **≤40–55 calls, then pause 10 s** to stay
      under 60 requests / 60 s per user+org. On a `429`, read `Retry-After` and back off exponentially
      before resuming.
@@ -74,7 +74,7 @@ string — the search engine treats them as garbage tokens.
 
 A markdown table sorted by `evidence_paper_count` **descending**, then the `.xlsx`. Columns:
 
-`NCT | acronym | drug (interventionNames) | sponsor | phase | overallStatus | intervention_class | evidence_paper_count | hasResults`
+`NCT | acronym | drug (interventionNames) | sponsor | phase | overallStatus | whyStopped | intervention_class | evidence_paper_count | hasResults`
 
 Then:
 
@@ -110,10 +110,11 @@ Then:
 This skill names commercial programs and their sponsors, so it is **medium-stakes** — a wrong
 "terminated/withdrawn" label is reputationally loaded. Bind these into every run:
 
-- **Field-grounded rows only.** `overallStatus`, `sponsorName`, `interventionNames`, `hasResults` are
-  rendered **verbatim from the returned TrialCore record** — never characterized. Write `TERMINATED`
-  because the field says `TERMINATED`; do **not** write "failed," "abandoned," or impute *why* a
-  trial stopped (`whyStopped` is not exposed by the MCP — never paraphrase it).
+- **Field-grounded rows only.** `overallStatus`, `whyStopped`, `sponsorName`, `interventionNames`,
+  `hasResults` are rendered **verbatim from the returned TrialCore record** — never characterized.
+  Write `TERMINATED` because the field says `TERMINATED`; do **not** write "failed" or "abandoned."
+  The reason a trial stopped is the `whyStopped` text, quoted as returned; when it is null, leave
+  the cell empty rather than imputing one.
 - **No subjective characterization** of a sponsor, drug, or program. "0 linked papers" is a checkable
   edge-count claim, not a quality judgement — state it as such.
 - **The verdict is a checkable field claim** — counts and statuses that trace to the returned

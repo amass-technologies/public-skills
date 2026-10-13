@@ -123,6 +123,8 @@ This applies to BiomedCore's author/institution filters, TrialCore's enum filter
 | `include` | string (repeatable) | `fulltext`, `authorsMetadata`, `meshIds`, `substanceIds`, `referencesTrialCore`, `references`, `citedBy` |
 | `minPublicationDate` | ISO date | e.g. `2024-01-01` |
 | `maxPublicationDate` | ISO date | |
+| `publicationTypes` | string (repeatable) | Match ANY NLM publication type, case-insensitive (`Clinical Trial`, `Randomized Controlled Trial`, `Meta-Analysis`, `Systematic Review`, `Review`, `Case Reports`, …). Trial and evidence-synthesis types also match their narrower types: `Clinical Trial` includes `Randomized Controlled Trial` and the phase types. `Review` matches only records typed `Review`; add `Systematic Review` or `Meta-Analysis` to include those. `Conference` matches conference abstracts. An unknown type is a `400` |
+| `journalIssns` | string (repeatable) | Match ANY journal by its linking ISSN (ISSN-L), the value records return in `issn`; a print or electronic ISSN matches only where it is also the linking one. With or without the hyphen; an invalid ISSN is a `400` |
 | `minCitationCount` | int | 0–100000 |
 | `minJournalQualityJufo` | enum | `0`, `1`, `2`, `3` (see below) |
 | `isRetracted` | bool | `true` / `false` |
@@ -161,7 +163,7 @@ title                 string|null
 abstract              string|null
 authors               string[]       e.g. ["Smith J", "Doe A"]
 journal               string|null
-issn                  string|null
+issn                  string|null    The journal's linking ISSN (ISSN-L), the value `journalIssns` filters on
 volumeIssue           string|null
 publicationDate       string|null    ISO date: electronic publication date when PubMed has one, otherwise the journal issue date
 lastUpdateDate        string|null    ISO date Amass last wrote the record
@@ -257,8 +259,8 @@ Items fail independently — always check each result for an `error` field befor
 | `interventionType` | enum (repeatable) | `DRUG`, `DEVICE`, `BIOLOGICAL`, `PROCEDURE`, `RADIATION`, `BEHAVIORAL`, `GENETIC`, `DIETARY_SUPPLEMENT`, `DIAGNOSTIC_TEST`, `COMBINATION_PRODUCT`, `OTHER` |
 | `facilityCountries` | string | Comma-separated ISO codes, e.g. `DE,US` |
 | `hasResults` | bool | |
-| `minStartDate` / `maxStartDate` | ISO date | |
-| `minCompletionDate` / `maxCompletionDate` | ISO date | |
+| `minStartDate` / `maxStartDate` | ISO date | Trials with no start date are excluded |
+| `minCompletionDate` / `maxCompletionDate` | ISO date | Ongoing trials count by their estimated completion date; trials with no completion date are excluded |
 | `minEnrollment` | int | Minimum participants |
 | `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the registration or start date. Records with no update date are excluded |
 | `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |

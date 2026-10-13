@@ -54,10 +54,10 @@ If Amass MCP tools are available in the environment, prefer those for search and
 
 | MCP tool | Wraps |
 | --- | --- |
-| `search_amass_biomedcore_records` | BiomedCore search (incl. author/institution filters) |
+| `search_amass_biomedcore_records` | BiomedCore search (incl. author/institution, `publicationTypes` and `journalIssns` filters, and `min`/`maxPublicationDate`) |
 | `get_amass_biomedcore_record` | BiomedCore get by Amass ID, PMID, **or** DOI (no separate lookup step; `includeFulltext` optional) |
-| `search_amass_trialcore_records` | TrialCore search |
-| `get_amass_trialcore_record` | TrialCore get by Amass ID, NCT ID, **or** registry ID (ICTRP-native, for non-US trials) |
+| `search_amass_trialcore_records` | TrialCore search (incl. `min`/`maxStartDate` and `min`/`maxCompletionDate`); each result carries `whyStopped` and `enrollmentType` but not endpoints, arms, or cross-links |
+| `get_amass_trialcore_record` | TrialCore get by Amass ID, NCT ID, **or** registry ID (ICTRP-native, for non-US trials); returns endpoints (`primaryOutcomeMeasures`/`secondaryOutcomeMeasures`), `armGroups`, `sponsorType`, `collaborators`, `whyStopped`, `resultsFirstPostDate`; `includeOutcomes` adds posted results (ClinicalTrials.gov trials only) |
 | `search_amass_drugcore_records` | DrugCore search |
 | `get_amass_drugcore_record` | DrugCore get by Amass ID **or** ChEMBL ID (returns parent/children + all cross-links) |
 | `search_amass_regulatorycore_records` | RegulatoryCore search |
@@ -65,7 +65,7 @@ If Amass MCP tools are available in the environment, prefer those for search and
 | `get_amass_regulatorycore_document_section` | One parsed label/review/SmPC/EPAR section with full text |
 | `search_amass_genecore_records` | GeneCore search (incl. druggability/tractability, target class, safety, constraint, essentiality filters) |
 | `get_amass_genecore_record` | GeneCore get by Amass ID **or** Ensembl gene ID (returns target intelligence + cross-links) |
-| `search_amass_patentcore_records` | PatentCore search *(preview)* — exposes a **subset** of the HTTP filters (`query`, `assignee`, `countryCode`, `cpcCodes`, `minCitedByCount`, `minPublicationDate`) |
+| `search_amass_patentcore_records` | PatentCore search *(preview)* — exposes a **subset** of the HTTP filters (`query`, `assignee`, `countryCode`, `cpcCodes`, `minCitedByCount`, `minPublicationDate`, `maxPublicationDate`) |
 | `get_amass_patentcore_record` | PatentCore get by Amass ID **or** publication number *(preview)* |
 | `send_feedback` | Report a data problem in a Core to the Amass data team — a wrong/missing/outdated value (`DATA_QUALITY`), a search that missed records that clearly exist (`DATA_QUALITY`, with `query` and `expectedIds`), or a field/filter/cross-link that does not exist (`DATA_MODEL`). Optional, never needed to answer a question, and Amass-Core-only — not for web or third-party results. Returns a receipt id. |
 
@@ -128,9 +128,11 @@ Free-text search without filters often returns noise, and there is no pagination
 Multi-value semantics everywhere: **repeat a filter to OR within it; combine different filters to AND across them.**
 
 **BiomedCore:**
-- "Recent" → `minPublicationDate=<concrete-date>` (e.g. 2 years before today's date in context)
+- "Recent" → `minPublicationDate=<concrete-date>` (e.g. 2 years before today's date in context); a closed window ("published in 2023") adds `maxPublicationDate`
 - "Well-cited" → `minCitationCount=10` (or higher for broad topics)
 - "Not retracted" → `isRetracted=false`
+- "RCTs" / "meta-analyses" / "case reports" → `publicationTypes=Randomized Controlled Trial` etc. (NLM types; `Clinical Trial` also covers RCTs and phase types; `Review` excludes systematic reviews and meta-analyses unless you add them; `Conference` = congress abstracts)
+- "In NEJM / The Lancet" → `journalIssns=<ISSN-L>` (repeatable). Read the linking ISSN from a known paper's `issn` field rather than recalling it
 - "High-impact" / "top journals" → `minJournalQualityJufo=2` (domain-leading) or `3` (highest). **Caveat:** JuFo is the Finnish ranking; many legitimate journals are unranked (`null`) and are excluded by any min filter. For a general "high impact" gate, prefer `minCitationCount`.
 - "By author X" / "from institution Y" → `authorNames` / `authorOrcids` / `institutionNames` / `institutionRors` (repeatable, OR within each). A two-part author name (`David Liu`, or the citation form `Liu DR`) must match a single author, so it is precise; the surname alone is the widest match. `institutionNames` matches both the normalized institution and the raw affiliation line. `authorOrcids` / `institutionRors` return a 400 for values that aren't identifiers — names go in `authorNames` / `institutionNames`. Pair with `include=authorsMetadata` to verify the match. Note `authorNames=X&institutionNames=Y` means *some* author X AND *some* affiliation Y — not necessarily the same person.
 
@@ -142,7 +144,7 @@ Multi-value semantics everywhere: **repeat a filter to OR within it; combine dif
 - "Interventional" / "observational" → `studyType=INTERVENTIONAL` etc.
 - Country mentioned → `facilityCountries=DE,US` (ISO codes, comma-separated)
 - "Has results posted" → `hasResults=true`
-- Date windows → `minStartDate` / `maxStartDate` / `minCompletionDate` / `maxCompletionDate`
+- Date windows → `minStartDate` / `maxStartDate` / `minCompletionDate` / `maxCompletionDate` (trials with no date of that kind drop out; an ongoing trial's completion date is its estimate, so "reading out in 2027" is `minCompletionDate=2027-01-01&maxCompletionDate=2027-12-31`)
 - "Large trial" → `minEnrollment=500`
 - A trial ID from any registry, or a sponsor development code (`LY3298176`), in `query` returns the matching trials first. EU trials register once per country; search returns one row per trial, while lookup by a bare EudraCT number (`EUCTR2013-000487-28`) returns every country's registration
 

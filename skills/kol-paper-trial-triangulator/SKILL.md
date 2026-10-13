@@ -107,8 +107,8 @@ referencesTrialCore_NCTs`.
   `journalQualityJufo` on each row before relying on it as a gate.
 - **429 rate limit.** Read `Retry-After`, back off, resume the fan-out.
 - **Do not guess → "not in abstract".** Any abstract-derived detail absent from the returned text is
-  reported as that literal absence. Do not paraphrase fields the MCP does not surface
-  (`primaryOutcomeMeasures`, `whyStopped`).
+  reported as that literal absence. Trial fields such as `primaryOutcomeMeasures` and `whyStopped`
+  are quoted verbatim from the fetched trial record, never paraphrased.
 
 ## Guardrail
 
