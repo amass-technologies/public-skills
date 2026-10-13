@@ -92,18 +92,18 @@ Before running anything, internalize the difference between the two cores. The s
 
 ### BiomedCore (papers) — `search_amass_biomedcore_records` / `get_amass_biomedcore_record`
 - **What's in it:** 43M+ PubMed/PMC citations, plus conference abstracts (`Conference` in `publicationTypes`), with abstracts, fulltext where available, and reference graphs (`references`, `citedBy`).
-- **Filters available on search:** `minPublicationDate` (ISO date), `minJournalQualityJufo` (0=evaluated/below-peer-review, 1=peer-reviewed, 2=domain-leading, 3=highest), `isRetracted` (boolean), plus author/institution filters: `authorOrcids`, `authorNames`, `institutionRors`, `institutionNames` (each an array — OR within one filter, AND across filters; a two-part name must match a single author; the surname alone is the widest match). The author filters are especially useful in late-phase enrichment: once Phase 1 surfaces a dominant lab, a follow-up search filtered to that author maps their output directly.
+- **Filters available on search:** `minPublicationDate` / `maxPublicationDate` (ISO dates), `publicationTypes` (NLM types, OR within: `Randomized Controlled Trial`, `Meta-Analysis`, `Systematic Review`, `Review`, `Conference`, …; `Clinical Trial` also covers RCTs and phase types), `journalIssns` (linking ISSN, as returned in `issn`), `minJournalQualityJufo` (0=evaluated/below-peer-review, 1=peer-reviewed, 2=domain-leading, 3=highest), `isRetracted` (boolean), plus author/institution filters: `authorOrcids`, `authorNames`, `institutionRors`, `institutionNames` (each an array — OR within one filter, AND across filters; a two-part name must match a single author; the surname alone is the widest match). The author filters are especially useful in late-phase enrichment: once Phase 1 surfaces a dominant lab, a follow-up search filtered to that author maps their output directly.
 - **`get_amass_biomedcore_record`** automatically returns the cross-link and reference fields — `references`, `citedBy`, and `referencesTrialCore` (which trials this paper cites). Set `includeFulltext: true` only when the abstract suggests the fulltext is worth the token cost (it can be large).
 - **Use for:** mechanism, target validation, biomarker evidence, systematic reviews, meta-analyses, retrospective analyses, the "why" of biomedical claims.
 
 ### TrialCore (clinical trials) — `search_amass_trialcore_records` / `get_amass_trialcore_record`
-- **What's in it:** 1.2M+ trials from ClinicalTrials.gov and non-US registries via the WHO ICTRP (non-US trials have a null `nctId`; use `registryId`), with protocol summaries, phase, status, sponsor, conditions, intervention names/types, enrollment, completion dates, facility countries, and `referencesBiomedCore` (which papers cite this trial).
+- **What's in it:** 1.2M+ trials from ClinicalTrials.gov and non-US registries via the WHO ICTRP (non-US trials have a null `nctId`; use `registryId`), with protocol summaries, phase, status and `whyStopped`, sponsor, conditions, intervention names/types, enrollment, completion dates, and facility countries. `get_amass_trialcore_record` adds registered endpoints (`primaryOutcomeMeasures`, `secondaryOutcomeMeasures`), `armGroups`, `collaborators`, and `referencesBiomedCore` (which papers cite this trial); `includeOutcomes: true` adds posted results for ClinicalTrials.gov trials, which cost context tokens, so set it only for the few trials whose readout the briefing reports.
 - **Filters available (with full enum values).** Each enum filter accepts a single value or an array — arrays match ANY of the listed values (OR within one filter), while different filters combine with AND. `phase: ["PHASE2", "PHASE3"]` + `overallStatus: "RECRUITING"` = (Phase 2 OR Phase 3) AND recruiting.
   - `phase`: `EARLY_PHASE1`, `PHASE1`, `PHASE1/PHASE2`, `PHASE2`, `PHASE2/PHASE3`, `PHASE3`, `PHASE4`, `NA`
   - `overallStatus`: `RECRUITING`, `NOT_YET_RECRUITING`, `ENROLLING_BY_INVITATION`, `ACTIVE_NOT_RECRUITING`, `SUSPENDED`, `TERMINATED`, `COMPLETED`, `WITHDRAWN`, `UNKNOWN`, `WITHHELD`, `AVAILABLE`, `NO_LONGER_AVAILABLE`, `TEMPORARILY_NOT_AVAILABLE`, `APPROVED_FOR_MARKETING`
   - `studyType`: `INTERVENTIONAL`, `OBSERVATIONAL`, `EXPANDED_ACCESS`
   - `interventionType`: `DRUG`, `DEVICE`, `BIOLOGICAL`, `COMBINATION_PRODUCT`, `PROCEDURE`, `RADIATION`, `DIETARY_SUPPLEMENT`, `GENETIC`, `BEHAVIORAL`, `DIAGNOSTIC_TEST`, `OTHER`
-  - `minStartDate` (ISO date), `hasResults` (boolean — filter to trials with posted results)
+  - `minStartDate` / `maxStartDate` and `minCompletionDate` / `maxCompletionDate` (ISO dates; ongoing trials count by their estimated completion date, and trials without the date drop out), `hasResults` (boolean — filter to trials with posted results)
 - **Use for:** what's in development right now, who's sponsoring it, recruitment status, phase distribution, geography, design patterns, posted endpoints.
 
 ### The cross-links — the part nobody else can do this cleanly
@@ -288,7 +288,7 @@ While results stream in, actively maintain three running lists. These are what c
 
 Era-gated searches surface field evolution. There are two regimes:
 
-- **Contested / paradigm-shifting fields** — era-gated comparison genuinely shows conclusion shifts. Run one BiomedCore search with `minPublicationDate` set 8+ years ago and one set ~3 years ago. Compare conclusions, terminology, and methodology.
+- **Contested / paradigm-shifting fields** — era-gated comparison genuinely shows conclusion shifts. Run one BiomedCore search closed by `maxPublicationDate` 8+ years ago (pair it with a `minPublicationDate` to fix the era) and one with `minPublicationDate` ~3 years ago. Compare conclusions, terminology, and methodology.
 - **Forward-progress fields** — where evidence is accumulating in one direction without overturned conclusions (e.g., a maturing drug class with a steady cadence of larger/longer trials). Era-gated comparison is less revealing here. **Either skip the two era-gated searches and reallocate that budget to enrichment, or** use a single old-era search purely to surface the *foundational* paper(s) that the field still references. Do not force a "paradigm shift" narrative when the data tells a forward-progress story.
 
 What to look for in either regime:
@@ -357,9 +357,9 @@ For each: title (linked), authors + year, journal + JuFo level if available, cit
 1. The most **mature trial with posted results** (`hasResults: true`, ideally Phase 3) — it's the closest thing the field has to a definitive read-out
 2. The most **important active trial** — typically a Phase 3 with high enrollment from a major sponsor, recruiting or active-not-recruiting
 3. **1–2 differentiator trials** — early-phase work testing a meaningfully different mechanism, modality, or population
-4. Optionally, a **terminated or withdrawn trial** if its termination teaches something (look for related papers via `referencesBiomedCore`)
+4. Optionally, a **terminated or withdrawn trial** if its termination teaches something: quote its `whyStopped` verbatim, and look for related papers via `referencesBiomedCore`
 
-For each: brief title (linked), NCT ID, sponsor, phase, status, enrollment, expected/actual completion date, one sentence on *why this trial matters*, and *what to watch for* (e.g., "Primary endpoint reads out Q3 2026 — will define the field's view on long-term safety").
+For each: brief title (linked), NCT ID, sponsor, phase, status, enrollment, expected/actual completion date, one sentence on *why this trial matters*, and *what to watch for* (e.g., "Primary endpoint reads out Q3 2026 — will define the field's view on long-term safety"). Name the endpoint from the trial's `primaryOutcomeMeasures` (`get_amass_trialcore_record`), not from memory.
 
 **Cross-link callouts** — if any reading-list paper has a `referencesTrialCore` entry that's also on the watch list (or vice versa), say so explicitly: "Paper #2 reports the results of Trial #1 on the watch list — read them as a pair."
 
@@ -438,7 +438,7 @@ Structured into three buckets. The Pipeline Holes bucket is where this skill ear
 - **Modality holes** — modalities (small molecule, antibody, ASO, cell therapy) that aren't represented in the pipeline despite mechanism support
 - **Phase holes** — areas with lots of Phase 1 but no Phase 2/3 (translation gap), or many old completed Phase 3s but nothing newer (innovation gap)
 - **Geographic holes** — trial activity concentrated in one region
-- **Termination clusters** — multiple terminated trials in a sub-area can signal a known but unpublished problem
+- **Termination clusters** — multiple terminated trials in a sub-area can signal a known but unpublished problem. Read each one's `whyStopped` (search returns it): safety or efficacy reasons carry the signal, while enrollment or business reasons usually do not
 
 For each gap, briefly state **why it matters** — what we don't know because the gap exists.
 

@@ -1,8 +1,8 @@
 # API mode: the exact monitor over the Amass change feed
 
 API mode runs `scripts/monitor.py`, a deterministic monitor over the Amass REST change feed. It sees
-what MCP mode cannot: trial results revised after their first posting, why a trial stopped, which
-label or SmPC sections changed, removals from the source, and the date of each change. It also
+what MCP mode cannot: trial results revised after their first posting, which label or SmPC
+sections changed, removals from the source, and the date of each change. It also
 suits hundreds of records and scheduled or CI runs. It needs:
 
 - `AMASS_API_KEY` in the environment (get one at <https://platform.amass.tech/api-keys>). The script

@@ -43,7 +43,7 @@ Anchor example: `trial_id = "NCT04611802"`.
 1. **Seed (trial record — the SEED STEP).**
    `get_amass_trialcore_record(type="nctId", value=<trial_id>)` (or `type="amassId"`).
    Note the honest identity for the verdict line — `sponsorName`, `phase`, `overallStatus`,
-   `enrollment`, `conditions` — and read the `referencesBiomedCore` array: the Amass ids of the
+   `enrollment`, `conditions`, and the registered primary endpoint (`primaryOutcomeMeasures`) — and read the `referencesBiomedCore` array: the Amass ids of the
    publications that describe this trial. The length of that array is the describing-paper count;
    report it as such, never as an exhaustive census.
 
@@ -77,8 +77,8 @@ enrolled) — N describing papers from referencesBiomedCore`), then the table so
 The relevance cell states the paper's own headline result in its own terms — a figure that appears
 verbatim in the returned abstract (e.g. an efficacy percentage or hazard ratio). If the abstract does
 not state something, write "not in abstract"; never paraphrase a trial outcome that is not present in
-a returned abstract, and never paraphrase a field the MCP does not surface
-(`primaryOutcomeMeasures`). Close with a one-line **Verdict**: "Trial <ID> (<sponsor>, <phase>,
+a returned abstract. When the header names the primary endpoint, quote `primaryOutcomeMeasures`
+verbatim. Close with a one-line **Verdict**: "Trial <ID> (<sponsor>, <phase>,
 <status>, <enrollment> enrolled) is described by N indexed papers; highest-cited: <title>
 (<citations> citations, PMID <pmid>)." Emit a `.csv` with one row per paper:
 `rank, title, journal, publicationDate, citationCount, journalQualityJufo, isRetracted, relevance,
@@ -104,7 +104,7 @@ pmid, amassId`.
 This output makes **clinical claims** — high stakes. Render only field-grounded rows: title
 (verbatim) + PMID + journal + date + `journalQualityJufo` + `isRetracted` + a relevance note quoted
 from the returned abstract. **Do not synthesize an endpoint, efficacy figure, or safety conclusion
-that is not stated verbatim in a returned abstract**, and do not paraphrase `primaryOutcomeMeasures`
-(the MCP does not expose it). The describing-paper count is the trial's `referencesBiomedCore` length,
+that is not stated verbatim in a returned abstract**, and quote `primaryOutcomeMeasures` verbatim
+rather than paraphrasing it. The describing-paper count is the trial's `referencesBiomedCore` length,
 not a census; frame it that way. When a relevance note quotes a result, it is the paper's own reported
 figure for the population the abstract names — not a generalized clinical claim.

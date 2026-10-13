@@ -172,7 +172,10 @@ TRIALCORE = Core(
         F("facilityCountries", OTHER, "set", "countries"),
         F("lastUpdateDate", METADATA, "date", "Amass update date"),
     ),
-    frozenset({"briefSummary", "createDate", "outcomes"}),
+    frozenset({
+        "briefSummary", "createDate", "outcomes", "enrollmentType", "sponsorType", "collaborators", "armGroups",
+        "primaryOutcomeMeasures", "secondaryOutcomeMeasures",
+    }),
 )
 
 BIOMEDCORE = Core(
@@ -191,7 +194,7 @@ BIOMEDCORE = Core(
         F("journalQualityJufo", METADATA, "int", "JuFo level"),
         F("lastUpdateDate", METADATA, "date", "Amass update date"),
     ),
-    frozenset({"abstract", "authors", "fulltext", "references", "citedBy", "createDate"}),
+    frozenset({"abstract", "authors", "fulltext", "references", "citedBy", "createDate", "issn"}),
 )
 
 REGULATORYCORE = Core(
@@ -861,9 +864,8 @@ ABOUT_LINES = (
     ("How a check works", "Claude re-reads each record through the Amass MCP connector, and the file's helper "
      "compares it field by field with the copy stored here. Daily checks re-run the stored searches and fetch "
      "only what they miss; a weekly full check fetches every record and also catches new cross-links."),
-    ("What it cannot see", "Results revised after their first posting, why a trial stopped, which label or SmPC "
-     "section changed, errata and expressions of concern, and the exact day of a change. Amass API mode sees "
-     "all of these."),
+    ("What it cannot see", "Results revised after their first posting, which label or SmPC section changed, and "
+     "the exact day of a change. Amass API mode sees all of these."),
     ("Worth watching", "Prompts computed from the records' own dates and registries (a trial about to end, a "
      "missed start date, results posted only in a registry copy, results not posted a year after completion). "
      "They come from what this file already holds and are not news from Amass."),

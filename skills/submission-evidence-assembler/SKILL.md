@@ -53,10 +53,11 @@ Amass returns the real asset→trial→paper graph with defensible trust metadat
      second wording or a wider phase and unioning the results.
 2. **Fetch each trial's identity + edge.** `get_amass_trialcore_record(type="nctId", value=<NCT>)` per
    trial. Read the honest identity (`sponsorName`, `overallStatus`, `enrollment`, `startDate`,
-   `completionDate`, `hasResults`) and the `referencesBiomedCore` array. Do not render
-   `primaryOutcomeMeasures` or `whyStopped` — they are not in the MCP TrialCore projection. If asked
-   for a trial's primary endpoint, quote it from a describing paper's abstract, or write "not in
-   abstract."
+   `completionDate`, `hasResults`) and the `referencesBiomedCore` array. If asked for a trial's
+   primary endpoint, quote the registered one verbatim from `primaryOutcomeMeasures`; for a stopped
+   trial, quote `whyStopped` verbatim. If asked for result figures, quote them from a describing
+   paper's abstract, or from the posted results (`includeOutcomes: true`, ClinicalTrials.gov trials
+   with `hasResults` only), or write "not in abstract."
 3. **Fan out to the describing papers.** For each `AMBC_` ID in every trial's `referencesBiomedCore`,
    call `get_amass_biomedcore_record(type="amassId", value=<AMBC>)` and read
    title · journal · publicationDate · citationCount · journalQualityJufo · isRetracted.
@@ -71,8 +72,8 @@ Amass returns the real asset→trial→paper graph with defensible trust metadat
 5. **Assemble the two artifacts** (Output template).
 
 Client-side post-processing forced by wrapper gaps: there is no `minCitationCount` search filter
-(filter/sort on the returned `citationCount` field); sponsor *type* is neither a search filter nor a
-returned field (read sponsor class from `sponsorName`); JuFo and retraction come from the returned
+(filter/sort on the returned `citationCount` field); sponsor *type* is not a search filter (read it
+from the fetched trial's `sponsorType`); JuFo and retraction come from the returned
 get-by-ID record fields, not a separate search step.
 
 ## Output template
@@ -113,7 +114,7 @@ returned N, under the requested limit)." For a truncated asset, state the trunca
 - **Thin results.** If the Phase-3 search returns 0–1 trials, report the count honestly and offer to
   widen the phase (PHASE2/PHASE3) or re-word the query; do not pad the dossier.
 - **Do not guess → "not in abstract".** Any abstract-derived field absent from the returned text is
-  written with that literal sentinel. Never paraphrase an MCP-omitted field into a claim.
+  written with that literal sentinel. Never fill a field the record does not return.
 
 ## Guardrail
 
@@ -126,10 +127,10 @@ and clinical claims, so the field-grounded discipline is bound into the skill, n
 - **No subjective characterization.** Do not call a paper "weak/strong," a journal "predatory," or a
   trial "failed." `isRetracted` and `journalQualityJufo` are reported as the field values Amass
   returns; the writer draws conclusions.
-- **No paraphrased omitted fields.** Never render `primaryOutcomeMeasures`, `whyStopped`, or any other
-  field absent from the MCP projection. Trial-outcome figures, if needed, are quoted verbatim from a
-  describing paper's abstract, or "not in abstract." Do not assert efficacy beyond what a returned
-  abstract states.
+- **Registry text verbatim.** `primaryOutcomeMeasures` and `whyStopped` are quoted exactly as returned,
+  never summarised. Trial-outcome figures, if needed, are quoted verbatim from a describing paper's
+  abstract or the trial's posted `outcomes`, or "not in abstract." Do not assert efficacy beyond what
+  a returned abstract or posted result states.
 - **Verdict is a checkable field claim.** "0 of 37 cited papers carry `isRetracted=true`" is a claim
   the reader can re-run against the same records — not an assurance of quality. The canonical Amass IDs
   in every row make the whole narrative independently re-fetchable. The skill assembles and
