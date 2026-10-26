@@ -193,11 +193,13 @@ TRIALCORE = Core(
     lookup_keys=("nctId", "registryId"),
     rules=(
         Rule("overallStatus", "scalar", STATUS),
+        Rule("lastKnownStatus", "scalar", STATUS),
         Rule("whyStopped", "scalar", STATUS),
         Rule("phase", "scalar", STATUS),
         Rule("enrollment", "scalar", STATUS),
         Rule("enrollmentType", "scalar", STATUS),
         Rule("startDate", "scalar", STATUS),
+        Rule("primaryCompletionDate", "scalar", STATUS),
         Rule("completionDate", "scalar", STATUS),
         Rule("hasResults", "scalar", RESULTS),
         Rule("resultsFirstPostDate", "scalar", RESULTS),

@@ -89,7 +89,7 @@ itself; when it says no, the section "When Amass says no" applies.
 
    ```bash
    python3 <skill folder>/scripts/board.py add <board> --core trialcore --search "ulotaront" --filter phase=PHASE3 --limit 50 <<'EOF'
-   [{"amassId": "AMTC_…", "nctId": "NCT0…", "registryId": "NCT0…", "sourceRegistry": "clinicaltrials_gov", "url": "https://…", "briefTitle": "…", "acronym": null, "sponsorName": "…", "phase": "PHASE3", "overallStatus": "COMPLETED", "whyStopped": null, "studyType": "INTERVENTIONAL", "startDate": "2019-11-01", "completionDate": "2023-02-01", "enrollment": 435, "conditions": ["Schizophrenia"], "interventionNames": ["SEP-363856", "Placebo"], "interventionTypes": ["DRUG"], "facilityCountries": ["US"], "hasResults": true}]
+   [{"amassId": "AMTC_…", "nctId": "NCT0…", "registryId": "NCT0…", "sourceRegistry": "clinicaltrials_gov", "url": "https://…", "briefTitle": "…", "acronym": null, "sponsorName": "…", "phase": "PHASE3", "overallStatus": "COMPLETED", "lastKnownStatus": null, "whyStopped": null, "studyType": "INTERVENTIONAL", "startDate": "2019-11-01", "primaryCompletionDate": "2023-01-23", "completionDate": "2023-02-01", "enrollment": 435, "conditions": ["Schizophrenia"], "interventionNames": ["SEP-363856", "Placebo"], "interventionTypes": ["DRUG"], "facilityCountries": ["US"], "hasResults": true}]
    EOF
    ```
 
@@ -253,7 +253,7 @@ once; neither is mentioned to the user.
 
 | Core | Interval | Quick check | Tracked | Not visible over MCP |
 | --- | --- | --- | --- | --- |
-| TrialCore | 1 day | yes | status, why stopped, phase, enrollment, start and completion dates, results posted; title, acronym, sponsor, study type, conditions, interventions, countries; linked papers and drugs (fetch) | results revised after the first posting, outcomes |
+| TrialCore | 1 day | yes | status, last known status, why stopped, phase, enrollment, start, primary completion and completion dates, results posted; title, acronym, sponsor, study type, conditions, interventions, countries; linked papers and drugs (fetch) | results revised after the first posting, outcomes |
 | BiomedCore | 1 day | yes | retracted, publication types (errata and expressions of concern); title, journal, publication date; linked trials (fetch); citations, full text, JuFo level as metadata | |
 | RegulatoryCore | 7 days | no | status, orphan flag, designations, withdrawal and refusal dates; FDA label date, SmPC date and revision, latest EMA procedure, EC decision date, parsed section count; name, substance, holder; linked drugs; Amass update date | which label or SmPC section changed, section text |
 | DrugCore | 7 days | no | highest stage, modality; name, synonyms, trade names, parent, mechanisms; linked trials, papers, authorizations, genes | the date of change |
@@ -262,6 +262,10 @@ once; neither is mentioned to the user.
 The interval is how often Amass refreshes the Core; `start` skips a Core checked more recently than
 that, since Amass has nothing newer for it yet. To check a Core less often, change its interval
 (`board.py set <board> --interval drugcore=30`).
+
+Since 2026-10-26 a RegulatoryCore record lists up to 3,000 parsed sections instead of 500, so the
+first check after that date can show a higher section count on long-marketed products. Tell the
+user it is Amass listing sections it had cut off, not a label revision.
 
 **Quick and full checks.** For TrialCore and BiomedCore, search results carry every tracked field
 except the cross-links. So within a week of a full check, a due check re-runs the stored searches
@@ -294,8 +298,9 @@ checking against the tool results.
   results while ClinicalTrials.gov has none. For non-US registries Amass sets that mark when the
   registry gives a results flag, a results or protocol link, or a results summary, so say "marked
   as having results", not "results posted";
-- completed 9 months ago or more with no results on ClinicalTrials.gov: "usually due by" a year
-  after completion, then "none a year after completion".
+- primary completion (or completion, when the registry gives no primary completion date) 9 months
+  ago or more with no results on ClinicalTrials.gov: "usually due by" a year after it, then "none a
+  year after primary completion".
 
 These are prompts to look, not changes.
 

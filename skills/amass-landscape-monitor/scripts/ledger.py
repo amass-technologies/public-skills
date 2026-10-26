@@ -176,8 +176,9 @@ for _core in (
             Col("nctId", "str"), Col("registryId", "str"), Col("sourceRegistry", "str"), Col("sourceUrl", "str"),
             Col("briefTitle", "text", group="text"), Col("acronym", "str"), Col("sponsorName", "str"),
             Col("phase", "enum", PHASES, group="status"), Col("overallStatus", "enum", TRIAL_STATUSES, group="status"),
+            Col("lastKnownStatus", "enum", TRIAL_STATUSES, group="status"),
             Col("studyType", "enum", STUDY_TYPES), Col("startDate", "date", group="dates"),
-            Col("completionDate", "date", group="dates"), Col("enrollment", "int", group="enrollment"),
+            Col("primaryCompletionDate", "date", group="dates"), Col("completionDate", "date", group="dates"), Col("enrollment", "int", group="enrollment"),
             Col("conditions", "list"), Col("interventionNames", "list"),
             Col("interventionTypes", "listenum", INTERVENTION_TYPES), Col("facilityCountries", "list"),
             Col("hasResults", "bool", group="results"), Col("links", "links", group="links", fetch_only=True),
@@ -2435,8 +2436,8 @@ def cmd_add_entity(args: argparse.Namespace) -> int:
 
 CURATED: dict[str, list[str]] = {  # column order on the per-Core sheets; everything else follows
     "trialcore": ["entities", "nctId", "registryId", "briefTitle", "phase", "overallStatus", "sponsorName", "startDate",
-                  "completionDate", "enrollment", "hasResults", "conditions", "interventionNames", "facilityCountries",
-                  "decision", "reason", "sourceUrl", "acronym", "studyType", "interventionTypes", "sourceRegistry", "links"],
+                  "primaryCompletionDate", "completionDate", "enrollment", "hasResults", "conditions", "interventionNames", "facilityCountries",
+                  "decision", "reason", "sourceUrl", "acronym", "studyType", "lastKnownStatus", "interventionTypes", "sourceRegistry", "links"],
     "biomedcore": ["entities", "pmid", "doi", "title", "journal", "publicationDate", "authors", "citationCount",
                    "journalQualityJufo", "hasFulltext", "isRetracted", "decision", "reason", "url", "links"],
     "patentcore": ["entities", "publicationNumber", "title", "assignees", "publicationDate", "priorityDate", "grantDate",

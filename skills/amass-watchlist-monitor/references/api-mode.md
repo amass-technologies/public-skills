@@ -132,7 +132,7 @@ the state folder. The API is poll-only; nothing runs unless something invokes th
 Markdown, grouped by class in this order. Empty classes are left out.
 
 1. **Removed from source**: the feed reported `deleted` (the registry, PubMed or agency register dropped the record).
-2. **Status and stage changes**: trial status, why stopped, phase, enrollment, start and completion dates; authorization status, designations, orphan flag, withdrawal date; drug stage or modality.
+2. **Status and stage changes**: trial status, last known status, why stopped, phase, enrollment, start, primary completion and completion dates; authorization status, designations, orphan flag, withdrawal date; drug stage or modality.
 3. **Results posted or revised**: `hasResults`, `resultsFirstPostDate`, and outcomes added, revised or removed (with the rows and values that moved).
 4. **Label and SmPC section changes**: sections the feed named, by document type (FDA label and review, EMA SmPC and EPAR), labels and SmPCs first; indication text, label date, SmPC date and revision number.
 5. **Retractions and corrections**: `isRetracted` flips and retraction, erratum or concern publication types.
@@ -153,7 +153,7 @@ Core. When nothing changed it says so. `templates/digest.example.md` is a real d
 | --- | --- | --- | --- | --- |
 | TrialCore | daily | next day | daily | Results-only revisions are reported even when the trial's `lastUpdateDate` does not move. Withdrawn or terminated trials are status changes, never removals. |
 | BiomedCore | daily | next day | daily | Expect many Metadata-only entries: citation-count refreshes touch far more papers than real changes do. A retraction is a change to `isRetracted`; a removal means NCBI withdrew the citation. |
-| RegulatoryCore | weekly | about a day after the weekly refresh | weekly | A revision confined to section text arrives with the record row unchanged; the digest still names the sections. A document parsed for the first time arrives as every one of its sections created. |
+| RegulatoryCore | weekly | about a day after the weekly refresh | weekly | A revision confined to section text arrives with the record row unchanged; the digest still names the sections. A document parsed for the first time arrives as every one of its sections created. FDA review sections got new ids on 2026-10-24 and records list up to 3,000 sections since 2026-10-26 (500 before), so the first run after those dates reports many review sections dropped and added: a re-keying, not a revision. |
 | DrugCore | weekly | about a day after the weekly refresh | weekly | An Open Targets release marks most drugs updated in one week. A new linked trial or authorization alone does not report the drug. A changed ChEMBL ID shows as a removal; look the drug up again by `chemblId`. |
 | GeneCore | weekly | about a day after the weekly refresh | weekly | Most weeks hold nothing for a given gene. A changed Ensembl id shows as a removal. |
 

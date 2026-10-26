@@ -53,7 +53,7 @@ Amass returns the real asset→trial→paper graph with defensible trust metadat
      second wording or a wider phase and unioning the results.
 2. **Fetch each trial's identity + edge.** `get_amass_trialcore_record(type="nctId", value=<NCT>)` per
    trial. Read the honest identity (`sponsorName`, `overallStatus`, `enrollment`, `startDate`,
-   `completionDate`, `hasResults`) and the `referencesBiomedCore` array. If asked for a trial's
+   `primaryCompletionDate`, `completionDate`, `hasResults`) and the `referencesBiomedCore` array. If asked for a trial's
    primary endpoint, quote the registered one verbatim from `primaryOutcomeMeasures`; for a stopped
    trial, quote `whyStopped` verbatim. If asked for result figures, quote them from a describing
    paper's abstract, or from the posted results (`includeOutcomes: true`, ClinicalTrials.gov trials

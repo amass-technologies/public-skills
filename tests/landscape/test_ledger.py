@@ -167,6 +167,12 @@ class RowTests(unittest.TestCase):
         self.assertEqual(row["fields"]["hasResults"], "true")
         self.assertEqual(row["fields"]["interventionNames"], "Ulotaront | Placebo")
         self.assertEqual(row["fields"]["phase"], "PHASE3")
+        errors = []
+        row = ledger.normalise_row(core, {**T2, "overallStatus": "UNKNOWN", "lastKnownStatus": "RECRUITING",
+                                          "primaryCompletionDate": "2024-06-30"}, "row 2", errors)
+        self.assertEqual(errors, [])
+        self.assertEqual(row["fields"]["lastKnownStatus"], "RECRUITING")
+        self.assertEqual(row["fields"]["primaryCompletionDate"], "2024-06-30")
 
     def test_rejects(self):
         core = ledger.CORES["trialcore"]
