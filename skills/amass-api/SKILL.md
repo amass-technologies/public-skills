@@ -28,6 +28,7 @@ Use this skill for **any** biomedical literature, clinical trial, drug, regulato
 - "Any recruiting Phase 3 lung cancer trials in Germany?" → TrialCore search with `phase`, `overallStatus`, `facilityCountries`
 - "What's PMID 38123456 about?" → BiomedCore lookup by PMID, then get-by-ID
 - "Summarize NCT06012345" → TrialCore lookup by NCT ID, then get-by-ID
+- "Can patients over 75 or with prior chemotherapy enrol in NCT06012345?" → TrialCore get-by-ID; read `minAgeYears` / `maxAgeYears`, and add `include=eligibilityCriteria` for the exclusion text
 - "Does this trial have any related publications?" → TrialCore get-by-ID with `include=referencesBiomedCore`, then BiomedCore get-by-ID for each AMBC ID
 - "What papers cite this one?" → BiomedCore get-by-ID with `include=citedBy`
 - "What has Liu's lab at the Broad published on base editing?" → BiomedCore search with `authorNames` / `institutionNames` (+ `include=authorsMetadata` to verify)
@@ -56,11 +57,11 @@ If Amass MCP tools are available in the environment, prefer those for search and
 | --- | --- |
 | `search_amass_biomedcore_records` | BiomedCore search (incl. author/institution, `publicationTypes` and `journalIssns` filters, and `min`/`maxPublicationDate`) |
 | `get_amass_biomedcore_record` | BiomedCore get by Amass ID, PMID, **or** DOI (no separate lookup step; `includeFulltext` optional) |
-| `search_amass_trialcore_records` | TrialCore search (incl. `min`/`maxStartDate` and `min`/`maxCompletionDate`); each result carries `whyStopped` and `enrollmentType` but not endpoints, arms, or cross-links |
-| `get_amass_trialcore_record` | TrialCore get by Amass ID, NCT ID, **or** registry ID (ICTRP-native, for non-US trials); returns endpoints (`primaryOutcomeMeasures`/`secondaryOutcomeMeasures`), `armGroups`, `sponsorType`, `collaborators`, `whyStopped`, `resultsFirstPostDate`; `includeOutcomes` adds posted results (ClinicalTrials.gov trials only) |
+| `search_amass_trialcore_records` | TrialCore search (incl. `min`/`maxStartDate` and `min`/`maxCompletionDate`); each result carries `whyStopped`, `enrollmentType`, `primaryCompletionDate` and `lastKnownStatus` but not endpoints, arms, eligibility, or cross-links |
+| `get_amass_trialcore_record` | TrialCore get by Amass ID, NCT ID, **or** registry ID (ICTRP-native, for non-US trials); returns endpoints (`primaryOutcomeMeasures`/`secondaryOutcomeMeasures`), `armGroups`, `sponsorType`, `collaborators`, `whyStopped`, `resultsFirstPostDate`, `primaryCompletionDate`, `lastKnownStatus`, and eligibility (`minAgeYears`, `maxAgeYears`, `sex`, `healthyVolunteers`, `ageGroups`); `includeEligibilityCriteria` adds the full inclusion/exclusion text, `includeOutcomes` the posted results (ClinicalTrials.gov trials only) |
 | `search_amass_drugcore_records` | DrugCore search |
 | `get_amass_drugcore_record` | DrugCore get by Amass ID **or** ChEMBL ID (returns parent/children + all cross-links) |
-| `search_amass_regulatorycore_records` | RegulatoryCore search |
+| `search_amass_regulatorycore_records` | RegulatoryCore search; with `amassId`, a full-text search inside that one record's labels, reviews, SmPCs and EPARs |
 | `get_amass_regulatorycore_record` | RegulatoryCore get by Amass ID, FDA application number, EMA product number, NDC, or SPL Set ID |
 | `get_amass_regulatorycore_document_section` | One parsed label/review/SmPC/EPAR section with full text |
 | `search_amass_genecore_records` | GeneCore search (incl. druggability/tractability, target class, safety, constraint, essentiality filters) |
@@ -72,9 +73,10 @@ If Amass MCP tools are available in the environment, prefer those for search and
 MCP-specific behaviors to know:
 - Searches take a `limit` of **1–50, defaulting to 10**. No search returns a `total`, so a full page never proves the set is complete — for coverage, run more, narrower searches as well as raising `limit`.
 - BiomedCore, TrialCore, RegulatoryCore, and GeneCore search take `minLastUpdateDate` and `minCreateDate` — when Amass last wrote a record, and when it first ingested one. Use them for "what changed since I last looked" and "what is new in Amass", independent of publication, trial-start, or authorization dates. GeneCore refreshes weekly, and `get_amass_genecore_record` (not search) returns `lastUpdateDate`.
+- MCP search date filters take a day (`2023-05-01`), a month (`2023-05`) or a year (`2023`): a lower bound starts on the period's first day, an upper bound ends on its last, so "published in 2023" is `minPublicationDate=2023` + `maxPublicationDate=2023`. Restrict by date with these filters, not by adding years to `query`. The HTTP API takes full ISO dates only.
 - Search and get results on every Core carry a `url` linking to the record's source — use it to cite. Its target may change, so build links to a specific system from the identifier fields (`amassId`, `pmid`, `doi`, `nctId`, `chemblId`, …).
 - The `get_*` tools accept external IDs directly (PMID/DOI, NCT, ChEMBL, FDA/EMA identifiers, patent publication number), so you never need the REST lookup endpoint over MCP for those. **Exceptions:** `get_amass_genecore_record` takes only an Amass ID or Ensembl gene ID — for any other gene identifier (HGNC, Entrez, UniProt, symbol, OMIM, Orphanet, IUPHAR) use the HTTP lookup endpoint; `get_amass_patentcore_record` takes only an Amass ID or publication number — to resolve an `applicationNumber` or `familyId` (one-to-many) use the HTTP lookup endpoint. TrialCore MCP get takes an Amass ID, NCT ID, or ICTRP `registryId` directly.
-- The MCP RegulatoryCore *search* does **not** return `documentSections`/`matchedText` (the HTTP search does). To read label/SmPC/review/EPAR text over MCP, use `get_amass_regulatorycore_record` for the section table of contents, then `get_amass_regulatorycore_document_section` to fetch a section's full text. The HTTP path additionally lets you scope a full-text search to one record with `&amassId=AMRC_…` and get `matchedText` excerpts back.
+- To read label/SmPC/review/EPAR text over MCP, call `search_amass_regulatorycore_records` with the record's `amassId` and a clinical phrase: it returns that record with up to `limit` matching `documentSections`, each with a `matchedText` excerpt. Then fetch a section's full text with `get_amass_regulatorycore_document_section`. A search without `amassId` returns no sections. `get_amass_regulatorycore_record` lists the whole table of contents, which runs to thousands of sections (mostly FDA reviews) on long-marketed products, so prefer the search inside the record over reading it.
 - The MCP PatentCore *search* exposes only a subset of the HTTP filters — for `ipcCodes`, `kindCode`, `language`, `inventor`, `hasClaims`/`hasDescription`, the filing/grant/priority date ranges, or the `include` flags (`claims`, `description`, `nplCitations`, `citedByPatents`, `referencesDrugCore`, `referencesBiomedCore`), fall back to HTTP.
 
 Fall back to direct HTTP via `curl` (Bash tool) or `requests` (Python) when:
@@ -144,9 +146,9 @@ Multi-value semantics everywhere: **repeat a filter to OR within it; combine dif
 - "Interventional" / "observational" → `studyType=INTERVENTIONAL` etc.
 - Country mentioned → `facilityCountries=DE,US` (ISO codes, comma-separated)
 - "Has results posted" → `hasResults=true`
-- Date windows → `minStartDate` / `maxStartDate` / `minCompletionDate` / `maxCompletionDate` (trials with no date of that kind drop out; an ongoing trial's completion date is its estimate, so "reading out in 2027" is `minCompletionDate=2027-01-01&maxCompletionDate=2027-12-31`)
+- Date windows → `minStartDate` / `maxStartDate` / `minCompletionDate` / `maxCompletionDate` (trials with no date of that kind drop out; an ongoing trial's completion date is its estimate, so "reading out in 2027" is `minCompletionDate=2027-01-01&maxCompletionDate=2027-12-31`). There is no filter on primary completion; read `primaryCompletionDate` (when primary results are due, ClinicalTrials.gov trials only) on the results to time a readout
 - "Large trial" → `minEnrollment=500`
-- A trial ID from any registry, or a sponsor development code (`LY3298176`), in `query` returns the matching trials first. EU trials register once per country; search returns one row per trial, while lookup by a bare EudraCT number (`EUCTR2013-000487-28`) returns every country's registration
+- A trial ID from any registry, or a sponsor development code (`LY3298176`), in `query` returns the matching trials first. EU trials register once per country; search returns one row per trial, while lookup by a bare EudraCT number (`EUCTR2013-000487-28`) returns every country's registration. A trial registered with ClinicalTrials.gov and another registry also comes back once, as its ClinicalTrials.gov record, whose `secondaryIds` lists the other registrations
 
 **DrugCore:**
 - "Antibody" / "small molecule" / "gene therapy" → `drugType=ANTIBODY` etc.
@@ -199,6 +201,7 @@ Default response fields are usually enough to answer the user. The `include` par
 
 - `include=fulltext` (BiomedCore) — large; only when you need to quote or analyse the article body.
 - `include=outcomes` (TrialCore) — structured results; only when the user asks about endpoints/measurements.
+- `include=eligibilityCriteria` (TrialCore) — the registered inclusion/exclusion text, often several thousand characters; only when the question turns on who can enrol. Age range, sex, `healthyVolunteers` and `ageGroups` come back by default.
 - `include=references` / `citedBy` (BiomedCore) — citation graph; pull only when doing reference analysis.
 - `include=referencesTrialCore` / `referencesBiomedCore` / `referencesRegulatoryCore` / `referencesDrugCore` — cross-core links; pull when bridging Cores.
 - `include=authorsMetadata` (BiomedCore) — ORCID, ROR, country; pull for "who at what institution" questions.

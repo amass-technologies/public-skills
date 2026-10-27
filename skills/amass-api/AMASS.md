@@ -251,7 +251,7 @@ Items fail independently — always check each result for an `error` field befor
 |---|---|---|
 | `query` | string (required) | Full-text search |
 | `limit` | int | 1–300, default 20 |
-| `include` | string (repeatable) | `outcomes`, `detailedDescription`, `referencesBiomedCore`, `referencesDrugCore` |
+| `include` | string (repeatable) | `outcomes`, `detailedDescription`, `eligibilityCriteria`, `referencesBiomedCore`, `referencesDrugCore` |
 | `phase` | enum (repeatable) | `EARLY_PHASE1`, `PHASE1`, `PHASE1/PHASE2`, `PHASE2`, `PHASE2/PHASE3`, `PHASE3`, `PHASE4`, `NA` |
 | `overallStatus` | enum (repeatable) | `RECRUITING`, `NOT_YET_RECRUITING`, `ENROLLING_BY_INVITATION`, `ACTIVE_NOT_RECRUITING`, `SUSPENDED`, `TERMINATED`, `COMPLETED`, `WITHDRAWN`, `UNKNOWN`, `WITHHELD`, `AVAILABLE`, `NO_LONGER_AVAILABLE`, `TEMPORARILY_NOT_AVAILABLE`, `APPROVED_FOR_MARKETING` |
 | `studyType` | enum (repeatable) | `INTERVENTIONAL`, `OBSERVATIONAL`, `EXPANDED_ACCESS` |
@@ -265,7 +265,7 @@ Items fail independently — always check each result for an `error` field befor
 | `minLastUpdateDate` / `maxLastUpdateDate` | ISO date | When Amass last wrote the record — any ingested change counts, not the registration or start date. Records with no update date are excluded |
 | `minCreateDate` | ISO date | When Amass first ingested the record. Records with no create date are excluded |
 
-`query` does more than keyword matching. A trial ID from any registry (NCT, EUCTR, CTIS, ChiCTR, ISRCTN, ACTRN, JPRN, …; casing ignored) returns that trial first, and a sponsor development code returns the trials carrying it (including in `orgStudyId` / `secondaryIds`) ahead of keyword hits. Sponsor, collaborator and site names are searched, and a target or therapy class (`BCMA`, `STING`) reaches trials whose interventions resolve to it. EUCTR registers a trial once per country; search returns it **once** (best-matching country) and `limit` counts distinct trials.
+`query` does more than keyword matching. A trial ID from any registry (NCT, EUCTR, CTIS, ChiCTR, ISRCTN, ACTRN, JPRN, …; casing ignored) returns that trial first, and a sponsor development code returns the trials carrying it (including in `orgStudyId` / `secondaryIds`) ahead of keyword hits. Sponsor, collaborator and site names are searched, and a target or therapy class (`BCMA`, `STING`) reaches trials whose interventions resolve to it. EUCTR registers a trial once per country; search returns it **once** (best-matching country) and `limit` counts distinct trials. A trial registered with ClinicalTrials.gov and another registry is likewise returned once, preferring its ClinicalTrials.gov record; its `secondaryIds` lists the other registrations, which lookup still resolves.
 
 ---
 
@@ -286,8 +286,10 @@ briefSummary                 string|null
 acronym                      string|null    e.g. "KEYNOTE-189"
 phase                        string|null
 overallStatus                string|null
+lastKnownStatus              string|null    Status last reported when overallStatus is UNKNOWN; else null. CT.gov only
 studyType                    string|null
 startDate                    string|null    ISO date
+primaryCompletionDate        string|null    ISO date primary results become available (estimate while ongoing). CT.gov only
 completionDate               string|null    ISO date
 lastUpdateDate               string|null    ISO date Amass last wrote the record (not a registry date)
 hasResults                   boolean
@@ -307,6 +309,11 @@ orgStudyId                   string|null
 secondaryIds                 string[]
 primaryOutcomeMeasures       string[]
 secondaryOutcomeMeasures     string[]
+minAgeYears                  number|null    Whole years; under one year reads as 0
+maxAgeYears                  number|null    Whole years, rounded up (11 months reads as 1)
+sex                          string|null    ALL | FEMALE | MALE
+healthyVolunteers            boolean|null   CT.gov only
+ageGroups                    string[]       CHILD (<18) | ADULT (18-64) | OLDER_ADULT (65+)
 designAllocation             string|null    RANDOMIZED | NON_RANDOMIZED | NA
 designInterventionModel      string|null    SINGLE_GROUP | PARALLEL | CROSSOVER | FACTORIAL | SEQUENTIAL
 designPrimaryPurpose         string|null    e.g. TREATMENT | PREVENTION | DIAGNOSTIC
@@ -323,6 +330,7 @@ oversightHasDmc              boolean|null   Data Monitoring Committee
 
 ```
 detailedDescription      string|null
+eligibilityCriteria      string|null   Inclusion and exclusion criteria as registered; can run to several thousand characters
 outcomes                 object[]      Structured outcome results (see below)
 referencesBiomedCore     string[]      AMBC_… IDs of papers this trial references
 referencesDrugCore       string[]      AMDC_… IDs of drugs studied by this trial (reverse of DrugCore's referencesTrialCore)
@@ -547,11 +555,11 @@ docType             string        FDA_LABEL | FDA_REVIEW | EMA_SMPC | EMA_EPAR
 path                string|null   Numbered/stable for FDA_LABEL (e.g. "5.2") and EMA_SMPC (e.g. "4.1"); opaque for FDA_REVIEW and EMA_EPAR
 title               string|null   Section heading
 textType            string|null   e.g. Label, SmPC, Medical_Review
-sourceUrl           string|null   Direct URL to the source PDF
-sourceDate          string|null   Source revision date (ISO)
+sourceUrl           string|null   Direct URL to the source PDF; for FDA_REVIEW, the review document or approval letter the section comes from. Can be null
+sourceDate          string|null   Source revision date (ISO); for FDA_REVIEW, that document's date
 ```
 
-Always address a section by its `documentSectionId`, never by `path`.
+Always address a section by its `documentSectionId`, never by `path`. The TOC lists up to 3,000 sections; a long-marketed product can carry thousands, mostly from FDA reviews.
 
 ### `fdaDetails` shape
 
@@ -574,11 +582,10 @@ refusalOfMarketingAuthorisationDate, withdrawalExpiryRevocationLapseDate, firstP
 
 ## RegulatoryCore — reading source documents
 
-Three steps, no PDF parsing on your side:
+Two steps, no PDF parsing on your side:
 
-1. **List the TOC.** `GET /records/{amassId}` → `documentSections[]` (content-free index).
-2. **(Optional) Scoped search.** `GET /records?query=<phrase>&amassId=AMRC_…` → just that record, `documentSections[]` narrowed to hits with `matchedText`.
-3. **Fetch the section.** `GET /records/{amassId}/document-sections/{documentSectionId}` → full `content` + `sourceUrl` to the PDF.
+1. **Find the sections.** For a topic, scoped search: `GET /records?query=<phrase>&amassId=AMRC_…` → just that record, `documentSections[]` narrowed to hits with `matchedText` (over MCP: `search_amass_regulatorycore_records` with `amassId`). To browse structure instead, list the TOC: `GET /records/{amassId}` → `documentSections[]` (content-free index, which can run to thousands of entries).
+2. **Fetch the section.** `GET /records/{amassId}/document-sections/{documentSectionId}` → full `content` + `sourceUrl` to the PDF.
 
 To compare the same topic across markets: resolve the counterpart record from `authorizationsByAgency`, list its TOC, fetch the equivalent section (FDA label `2 Dosage and Administration` ↔ SmPC `4.2 Posology`).
 

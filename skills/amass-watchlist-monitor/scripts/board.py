@@ -153,10 +153,12 @@ TRIALCORE = Core(
     ("nctId", "registryId", "sourceRegistry", "url"),
     (
         F("overallStatus", STATUS, "enum", "status", choices=TRIAL_STATUSES),
+        F("lastKnownStatus", STATUS, "enum", "last known status", choices=TRIAL_STATUSES),
         F("whyStopped", STATUS, "str", "why stopped"),
         F("phase", STATUS, "enum", choices=PHASES),
         F("enrollment", OTHER, "int"),
         F("startDate", STATUS, "date", "start date"),
+        F("primaryCompletionDate", STATUS, "date", "primary completion date"),
         F("completionDate", STATUS, "date", "completion date"),
         F("hasResults", RESULTS, "bool", "results posted"),
         F("resultsFirstPostDate", RESULTS, "date", "results first posted"),
@@ -174,7 +176,8 @@ TRIALCORE = Core(
     ),
     frozenset({
         "briefSummary", "createDate", "outcomes", "enrollmentType", "sponsorType", "collaborators", "armGroups",
-        "primaryOutcomeMeasures", "secondaryOutcomeMeasures",
+        "primaryOutcomeMeasures", "secondaryOutcomeMeasures", "minAgeYears", "maxAgeYears", "sex",
+        "healthyVolunteers", "ageGroups", "eligibilityCriteria",
     }),
 )
 
@@ -867,7 +870,7 @@ ABOUT_LINES = (
     ("What it cannot see", "Results revised after their first posting, which label or SmPC section changed, and "
      "the exact day of a change. Amass API mode sees all of these."),
     ("Worth watching", "Prompts computed from the records' own dates and registries (a trial about to end, a "
-     "missed start date, results posted only in a registry copy, results not posted a year after completion). "
+     "missed start date, results posted only in a registry copy, results not posted a year after primary completion). "
      "They come from what this file already holds and are not news from Amass."),
 )
 
@@ -979,6 +982,13 @@ def _a_year_after(day: dt.date) -> dt.date:
         return day + dt.timedelta(days=365)
 
 
+def results_basis(f: dict) -> tuple:
+    """(date, label) that ClinicalTrials.gov's one-year results deadline runs from: primary completion when known."""
+    if f.get("primaryCompletionDate"):
+        return f["primaryCompletionDate"], "primary completion"
+    return f.get("completionDate"), "completion"
+
+
 def results_state(records: dict, rid: str, copy_ids: list, today: dt.date) -> str:
     """'yes', 'CTIS only', 'due Nov 2026', 'none after 1 yr', or blank while a trial is under way."""
     f = records[rid]["fields"]
@@ -992,7 +1002,7 @@ def results_state(records: dict, rid: str, copy_ids: list, today: dt.date) -> st
         return f"marked in {in_copy[0]}"
     if f.get("overallStatus") != "COMPLETED":
         return ""
-    end = partial_date(f.get("completionDate"))
+    end = partial_date(results_basis(f)[0])
     if end is None or records[rid]["identity"].get("sourceRegistry") != "clinicaltrials_gov":
         return "no"
     due = _a_year_after(end)
@@ -1037,18 +1047,20 @@ def watch_entries(records: dict, today: dt.date) -> list:
         flags = [copy_flag(rec, records[c]) for c in copies.get(rid, [])]
         flags = [x for x in flags if x]
         results_due = None
-        if (status == "COMPLETED" and f.get("hasResults") is False and end
+        basis, basis_label = results_basis(f)
+        results_from = partial_date(basis)
+        if (status == "COMPLETED" and f.get("hasResults") is False and results_from
                 and rec["identity"].get("sourceRegistry") == "clinicaltrials_gov"):
-            due = _a_year_after(end)
+            due = _a_year_after(results_from)
             if today > due:
-                results_due = f"none on ClinicalTrials.gov a year after completion ({human_month(f['completionDate'])})"
-            elif (today - end).days >= 270 or flags:
+                results_due = f"none on ClinicalTrials.gov a year after {basis_label} ({human_month(basis)})"
+            elif (today - results_from).days >= 270 or flags:
                 results_due = f"ClinicalTrials.gov results usually due by {MONTHS[due.month - 1]} {due.year}"
         for flag in flags:
             text = flag + (f"; {results_due}" if results_due and "marked as having results" in flag else "")
             reasons.append((1, end or dt.date.max, text))
         if results_due and not any("marked as having results" in x for x in flags):
-            reasons.append((2, end, _cap(results_due) if not results_due.startswith("none") else
+            reasons.append((2, results_from, _cap(results_due) if not results_due.startswith("none") else
                             "no results " + results_due[len("none "):]))
         if reasons:
             reasons.sort(key=lambda r: (r[0], r[1]))

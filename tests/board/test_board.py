@@ -277,6 +277,18 @@ class BoardTest(unittest.TestCase):
         self.assertIn("| Short name | Trial | Status | Phase | Results | Ends | Also in |", shown)
         self.assertIn("status: Active, not recruiting → Completed", shown)
 
+    def test_results_due_from_primary_completion(self):
+        fields = {"overallStatus": "COMPLETED", "hasResults": False, "primaryCompletionDate": "2025-01-15",
+                  "completionDate": "2025-09-30"}
+        records = {NCT07759128: {"core": "trialcore", "fields": fields,
+                                 "identity": {"sourceRegistry": "clinicaltrials_gov"}}}
+        today = board.dt.date(2026, 3, 1)
+        self.assertEqual(board.watch_entries(records, today), [
+            (NCT07759128, "no results on ClinicalTrials.gov a year after primary completion (Jan 2025)")])
+        self.assertEqual(board.results_state(records, NCT07759128, [], today), "none after 1 yr")
+        del fields["primaryCompletionDate"]
+        self.assertEqual(board.results_state(records, NCT07759128, [], today), "due Sep 2026")
+
     def test_short_names_and_notes_typed_in_excel_are_kept(self):
         self.setup_board()
         self.run_cmd("annotate", self.path, "--id", "NCT07759128", "--label", "GAD fixed dose")
